@@ -1,0 +1,46 @@
+[package]
+name = "code-crime-scene"
+version = "0.1.0"
+description = "Code Crime Scene — offline-first forensic code analyzer"
+authors = ["mhmds"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "code_crime_scene_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Local heavy-lifting (scan / analyze / store)
+walkdir = "2"
+regex = "1"
+
+# Local storage — SQLite compiled from source ("bundled"), no system dependency.
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Secure API-key storage in the OS keychain (NOT localStorage).
+# windows-native -> Windows Credential Manager. For macOS add "apple-native",
+# for Linux add "sync-secret-service".
+keyring = { version = "3", features = ["windows-native"] }
+
+# DeepSeek HTTP client. Default TLS uses the OS stack (SChannel on Windows,
+# Secure Transport on macOS) — no OpenSSL and no NASM/ring build step.
+reqwest = { version = "0.12", features = ["json"] }
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+strip = true

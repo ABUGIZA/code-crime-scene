@@ -1,0 +1,58 @@
+<svg width="1280" height="440" viewBox="0 0 1280 440" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Code Crime Scene — offline-first forensic code analyzer">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E0F11"/>
+      <stop offset="1" stop-color="#141619"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop stop-color="#E0A33A" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#E0A33A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gauge" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#E0A33A"/>
+      <stop offset="1" stop-color="#caa24e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="440" fill="url(#bg)"/>
+  <ellipse cx="1030" cy="220" rx="430" ry="300" fill="url(#glow)"/>
+
+  <!-- film-grain evidence dots -->
+  <g fill="#E0A33A" opacity="0.10">
+    <circle cx="80" cy="360" r="2"/><circle cx="140" cy="120" r="1.5"/><circle cx="220" cy="300" r="2"/>
+    <circle cx="300" cy="80" r="1.5"/><circle cx="60" cy="200" r="1.5"/><circle cx="180" cy="380" r="1.5"/>
+  </g>
+
+  <!-- crime-scene tape -->
+  <g transform="rotate(-7 0 80)">
+    <rect x="-40" y="44" width="1360" height="34" fill="#E0A33A"/>
+    <text x="40" y="67" font-family="Consolas, 'Courier New', monospace" font-size="17" font-weight="700" letter-spacing="6" fill="#0E0F11">
+      DO NOT CROSS · FORENSIC CODE ANALYSIS · DO NOT CROSS · FORENSIC CODE ANALYSIS · DO NOT CROSS · FORENSIC CODE ANALYSIS
+    </text>
+  </g>
+
+  <!-- title block -->
+  <text x="72" y="232" font-family="Bahnschrift, 'Segoe UI', sans-serif" font-size="92" font-weight="700" letter-spacing="-1" fill="#F4F1EA">CODE CRIME</text>
+  <text x="72" y="318" font-family="Bahnschrift, 'Segoe UI', sans-serif" font-size="92" font-weight="700" letter-spacing="-1" fill="#E0A33A">SCENE</text>
+  <text x="78" y="362" font-family="Consolas, 'Courier New', monospace" font-size="19" letter-spacing="2" fill="#9aa1a8">Offline-first forensic analyzer for your codebase — runs 100% on your machine.</text>
+
+  <!-- evidence chips -->
+  <g font-family="Consolas, 'Courier New', monospace" font-size="13" fill="#c7cdd3">
+    <rect x="78" y="386" width="150" height="30" rx="6" fill="#15171a" stroke="#2a2e33"/>
+    <text x="96" y="406">Tauri · Rust · React</text>
+    <rect x="240" y="386" width="118" height="30" rx="6" fill="#15171a" stroke="#2a2e33"/>
+    <text x="258" y="406">No cloud · No login</text>
+    <rect x="370" y="386" width="172" height="30" rx="6" fill="#15171a" stroke="#2a2e33"/>
+    <text x="388" y="406">DeepSeek AI · optional</text>
+  </g>
+
+  <!-- forensic grade stamp / gauge -->
+  <g transform="translate(1040 220)">
+    <circle r="118" fill="none" stroke="#23262b" stroke-width="16"/>
+    <circle r="118" fill="none" stroke="url(#gauge)" stroke-width="16" stroke-linecap="round"
+            stroke-dasharray="525 741" transform="rotate(-90)"/>
+    <text x="0" y="6" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', sans-serif" font-size="74" font-weight="700" fill="#F4F1EA">A</text>
+    <text x="0" y="44" text-anchor="middle" font-family="Consolas, monospace" font-size="15" letter-spacing="3" fill="#9aa1a8">PROJECT SCORE</text>
+    <text x="0" y="-150" text-anchor="middle" font-family="Consolas, monospace" font-size="13" letter-spacing="5" fill="#E0A33A">VERDICT</text>
+  </g>
+</svg>

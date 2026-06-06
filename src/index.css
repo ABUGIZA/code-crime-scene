@@ -1,0 +1,334 @@
+/* ============================================================================
+   Code Crime Scene — Forensic Noir design system
+   A hand-built dark theme: warm charcoal, evidence-amber accent, industrial
+   condensed display type, monospace data, and tactile forensic details.
+   ========================================================================== */
+
+:root {
+  /* surfaces — warm near-black, not blue-black */
+  --bg: #0e0f11;
+  --bg-2: #121316;
+  --panel: #17181c;
+  --panel-2: #1c1e23;
+  --panel-3: #232529;
+  --line: #2b2e35;
+  --line-soft: #212328;
+
+  /* ink — paper-warm whites */
+  --ink: #e9e6df;
+  --ink-2: #b6b2a8;
+  --ink-3: #837f76;
+  --ink-faint: #56544e;
+
+  /* signature + semantics */
+  --amber: #e0a33a; /* evidence amber — the one accent */
+  --amber-soft: #2a2114;
+  --red: #e5544b; /* crime red */
+  --red-soft: #2c1714;
+  --green: #5fb47e; /* forensic green */
+  --green-soft: #14241a;
+  --steel: #6e9bc4;
+  --chalk: #cfd8e3;
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.85);
+
+  --font-display: "Bahnschrift", "DIN Alternate", "Oswald", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* faint film-grain overlay for tactility (anti-flat) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+::selection {
+  background: rgba(224, 163, 58, 0.28);
+  color: #fff;
+}
+
+/* scrollbars */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c2f37;
+  border: 3px solid var(--bg);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3e47;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* utility ------------------------------------------------------------------ */
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+/* evidence tape — hazard-striped band, used sparingly as an accent */
+.tape {
+  height: 8px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--amber) 0 10px,
+    #0c0c0e 10px 20px
+  );
+  opacity: 0.9;
+}
+
+/* buttons ------------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.06s ease;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--panel-3);
+  border-color: #3a3e47;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #1a1305;
+  font-weight: 650;
+}
+.btn-primary:hover {
+  background: #ecb24d;
+  border-color: #ecb24d;
+}
+
+.btn-danger {
+  color: var(--red);
+  border-color: #43221f;
+  background: var(--red-soft);
+}
+.btn-danger:hover {
+  background: #38201d;
+  border-color: #5a2a26;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn-ghost:hover {
+  background: var(--panel-2);
+  border-color: var(--line-soft);
+}
+
+.btn-lg {
+  padding: 13px 22px;
+  font-size: 14px;
+}
+
+/* inputs ------------------------------------------------------------------- */
+
+.input {
+  width: 100%;
+  padding: 11px 13px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.input::placeholder {
+  color: var(--ink-faint);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(224, 163, 58, 0.13);
+}
+
+/* cards -------------------------------------------------------------------- */
+
+.card {
+  background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 140%);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.card-pad {
+  padding: 20px;
+}
+
+/* forensic corner ticks — measurement marks on featured cards */
+.ticks {
+  position: relative;
+}
+.ticks::before,
+.ticks::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--ink-faint);
+  opacity: 0.55;
+}
+.ticks::before {
+  top: 9px;
+  left: 9px;
+  border-right: none;
+  border-bottom: none;
+}
+.ticks::after {
+  bottom: 9px;
+  right: 9px;
+  border-left: none;
+  border-top: none;
+}
+
+/* chips -------------------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.chip.good {
+  color: var(--green);
+  border-color: #244033;
+  background: var(--green-soft);
+}
+.chip.good .dot {
+  background: var(--green);
+}
+.chip.warn {
+  color: var(--amber);
+  border-color: #45381c;
+  background: var(--amber-soft);
+}
+.chip.warn .dot {
+  background: var(--amber);
+}
+.chip.bad {
+  color: var(--red);
+  border-color: #4a2622;
+  background: var(--red-soft);
+}
+.chip.bad .dot {
+  background: var(--red);
+}
+
+/* semantic text colors */
+.t-good {
+  color: var(--green);
+}
+.t-warn {
+  color: var(--amber);
+}
+.t-bad {
+  color: var(--red);
+}
