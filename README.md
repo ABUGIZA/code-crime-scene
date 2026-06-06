@@ -150,8 +150,12 @@ So we did the honest thing. We clicked the report's **"Copy as prompt"** button,
 
 ## Install
 
-Build from source:
+### Download (Windows)
+Grab **[Code-Crime-Scene.exe](https://github.com/ABUGIZA/code-crime-scene/raw/main/Code-Crime-Scene.exe)** (≈11 MB) straight from this repo and double-click — one self-contained binary, no installer, no dependencies.
 
+> ⚠️ Not code-signed yet, so Windows SmartScreen may warn on first run — click **More info → Run anyway**.
+
+### Build from source
 ```bash
 # prerequisites: Node 18+, Rust (stable), and the Tauri prerequisites for your OS
 git clone https://github.com/ABUGIZA/code-crime-scene.git
@@ -161,8 +165,6 @@ npm install
 npm run tauri dev      # run in development
 npm run tauri build    # produce a standalone binary
 ```
-
-> A prebuilt Windows binary will be published on the **Releases** page in a future update.
 
 ---
 

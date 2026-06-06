@@ -15,8 +15,10 @@ dist-ssr
 # Rust / Tauri build output (large — never commit)
 src-tauri/target/
 
-# Built binaries — ship these via GitHub Releases, not the repo
+# Built binaries (ignore stray build outputs)…
 /*.exe
+# …but keep the distributed Windows app committed so it's directly downloadable
+!/Code-Crime-Scene.exe
 *.bak
 
 # Local tooling

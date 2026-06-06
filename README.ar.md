@@ -132,7 +132,11 @@
 
 ## التثبيت
 
-ابنِ من المصدر:
+**تحميل (ويندوز):** نزّل **[Code-Crime-Scene.exe](https://github.com/ABUGIZA/code-crime-scene/raw/main/Code-Crime-Scene.exe)** (≈11 ميجا) مباشرةً من المستودع وافتحه بنقرتين — ملف واحد مستقلّ، بلا مثبّت وبلا اعتماديات.
+
+> ⚠️ غير موقّع بعد، فقد يظهر تحذير SmartScreen أول مرّة — اضغط **More info ← Run anyway**.
+
+**ابنِ من المصدر:**
 ```bash
 # المتطلبات: Node 18+، Rust (stable)، ومتطلبات Tauri لنظامك
 git clone https://github.com/ABUGIZA/code-crime-scene.git
@@ -141,8 +145,6 @@ npm install
 npm run tauri dev      # تشغيل تطويري
 npm run tauri build    # إنتاج نسخة مستقلّة
 ```
-
-> نسخة ويندوز جاهزة ستُنشر على صفحة **الإصدارات** في تحديث قادم.
 
 ---
 
