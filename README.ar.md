@@ -132,17 +132,17 @@
 
 ## التثبيت
 
-**خيار أ — حمّل التطبيق (ويندوز):** نزّل `Code-Crime-Scene.exe` من صفحة [الإصدارات](../../releases) وافتحه بنقرتين. ملف واحد مستقلّ، بلا مثبّت وبلا اعتماديات.
-
-**خيار ب — ابنِ من المصدر:**
+ابنِ من المصدر:
 ```bash
 # المتطلبات: Node 18+، Rust (stable)، ومتطلبات Tauri لنظامك
 git clone https://github.com/ABUGIZA/code-crime-scene.git
 cd code-crime-scene
 npm install
 npm run tauri dev      # تشغيل تطويري
-npm run tauri build    # إنتاج نسخة الإصدار
+npm run tauri build    # إنتاج نسخة مستقلّة
 ```
+
+> نسخة ويندوز جاهزة ستُنشر على صفحة **الإصدارات** في تحديث قادم.
 
 ---
 

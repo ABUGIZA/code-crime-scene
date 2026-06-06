@@ -150,10 +150,8 @@ So we did the honest thing. We clicked the report's **"Copy as prompt"** button,
 
 ## Install
 
-### Option A — download the app (Windows)
-Grab `Code-Crime-Scene.exe` from the [Releases](../../releases) page and double-click it. It's a single, self-contained binary — no installer, no dependencies.
+Build from source:
 
-### Option B — build from source
 ```bash
 # prerequisites: Node 18+, Rust (stable), and the Tauri prerequisites for your OS
 git clone https://github.com/ABUGIZA/code-crime-scene.git
@@ -161,8 +159,10 @@ cd code-crime-scene
 npm install
 
 npm run tauri dev      # run in development
-npm run tauri build    # produce a release binary
+npm run tauri build    # produce a standalone binary
 ```
+
+> A prebuilt Windows binary will be published on the **Releases** page in a future update.
 
 ---
 
