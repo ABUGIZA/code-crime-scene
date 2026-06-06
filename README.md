@@ -151,7 +151,7 @@ So we did the honest thing. We clicked the report's **"Copy as prompt"** button,
 ## Install
 
 ### Option A — download the app (Windows)
-Grab `Code Crime Scene.exe` from the [Releases](../../releases) page and double-click it. It's a single, self-contained binary — no installer, no dependencies.
+Grab `Code-Crime-Scene.exe` from the [Releases](../../releases) page and double-click it. It's a single, self-contained binary — no installer, no dependencies.
 
 ### Option B — build from source
 ```bash
