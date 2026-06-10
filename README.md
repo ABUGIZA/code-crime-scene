@@ -14,7 +14,7 @@
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows-0E0F11?style=flat-square">
   <img alt="built with" src="https://img.shields.io/badge/built%20with-Tauri%20·%20Rust%20·%20React-E0A33A?style=flat-square">
   <img alt="offline" src="https://img.shields.io/badge/privacy-offline--first-2ea043?style=flat-square">
-  <img alt="ai" src="https://img.shields.io/badge/AI-DeepSeek%20(optional)-6e5494?style=flat-square">
+  <img alt="ai" src="https://img.shields.io/badge/AI-DeepSeek%20%C2%B7%20OpenAI%20%C2%B7%20Claude%20%C2%B7%20Ollama%20(optional)-6e5494?style=flat-square">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
 </p>
 
@@ -26,11 +26,11 @@
 
 **Code Crime Scene** is a local, single-binary desktop tool for developers and teams who want an honest, fast read on the health of a codebase — without uploading a single line of source to the cloud.
 
-You point it at a folder. A Rust engine walks the tree, runs static analysis entirely on your machine, and produces a **"Forensic Noir" report**: five headline scores, a graded verdict, and a list of **actionable findings** — each with evidence (file + line + a one-line snippet), a numeric risk rationale, and a safe, PR-by-PR refactor plan.
+You point it at a folder. A Rust engine walks the tree, runs static analysis entirely on your machine, and produces a **"Forensic Noir" report**: five headline scores, a graded verdict, and a list of **actionable findings** — each with evidence (file + line + a one-line snippet), a numeric risk rationale, and a safe, PR-by-PR refactor plan. The engine measures **cyclomatic complexity per function**, detects **dependency cycles**, mines your **git history** for hotspots and bus-factor risk, and scans for **16+ kinds of leaked secrets** with entropy analysis.
 
-A second, **optional** opinion is available: send a compact, **code-free** summary to **DeepSeek** for a written "Detective's Report." Your source code never leaves the machine — only aggregate metrics and file paths are transmitted, and only when you explicitly ask.
+A second, **optional** opinion is available: send a compact, **code-free** summary to the AI provider of your choice — **DeepSeek, OpenAI, Claude (Anthropic), or a local model (Ollama / LM Studio)** — for a written "Detective's Report." Your source code never leaves the machine — only aggregate metrics and file paths are transmitted, and only when you explicitly ask.
 
-> **Offline by default. AI by choice.** The scan is 100% local. DeepSeek is only contacted when you press **"Analyze with AI."**
+> **Offline by default. AI by choice.** The scan is 100% local. No AI is contacted until you press **"Analyze with AI."**
 
 ---
 
@@ -39,13 +39,17 @@ A second, **optional** opinion is available: send a compact, **code-free** summa
 | | |
 |---|---|
 | 🔒 **Offline-first** | No backend, no login, no telemetry. Static analysis runs locally in Rust. |
-| 🧠 **Optional AI** | DeepSeek gives a deeper, written read — on request, with a code-free summary. |
+| 🧮 **Real complexity** | Cyclomatic complexity for every function — the riskiest land in the report's *Interrogation Room*. |
+| 🕰️ **Git forensics** | Change hotspots, files that always change together, and single-owner (bus-factor) risk — mined locally from your repo's history (*The Rap Sheet*). |
+| 🎮 **Lua & FiveM aware** | Full Lua support including FiveM resources: events, NUI, threads, commands, QBCore/ESX/ox patterns, client/server detection — even `server.cfg` secrets. |
+| 🧠 **Optional AI — your pick** | DeepSeek, OpenAI, Claude (Anthropic), or a local Ollama/LM Studio model — on request, with a code-free summary. |
 | 🎯 **Evidence-ranked findings** | Real usage beats imports/types/comments. Every finding cites file, line, and a snippet. |
-| 📊 **Five scores + verdict** | Project Score, Technical Debt, Architecture, Security Risk, Maintainability. |
+| 📊 **Five scores + verdict** | Project Score, Technical Debt, Architecture, Security Risk, Maintainability — with ▲▼ trends vs your previous scan. |
 | 🧩 **Context-aware** | Knows a hook from a server entrypoint from an icon file; suggests fixes that fit the file. |
+| 🛡️ **Secrets v2** | 16+ token patterns (GitHub, Stripe, AWS, Google, Slack, Telegram, JWT, FiveM rcon…) + Shannon-entropy detection, always redacted. |
 | 🩹 **Safe refactor plans** | Each finding ships a PR-by-PR slicing plan + the exact `npm run` verify commands. |
 | 🌍 **Bilingual** | Full English / Arabic UI (RTL), and the AI replies in your chosen language. |
-| 🔑 **Keys in the OS keychain** | Your API key lives in Windows Credential Manager — never in a file, never in the webview. |
+| 🔑 **Keys in the OS keychain** | API keys live in Windows Credential Manager (one slot per provider) — never in a file, never in the webview. |
 | 🗄️ **Local history** | Every report is saved to a local SQLite database you can reopen anytime. |
 
 ---
@@ -74,7 +78,7 @@ A second, **optional** opinion is available: send a compact, **code-free** summa
     <td width="50%" align="center" valign="top">
       <img src="assets/screenshots/ai-report.png" alt="Detective's Report"><br>
       <b>Detective's Report — optional AI</b><br>
-      <sub>A written verdict from DeepSeek, on request, code-free.</sub>
+      <sub>A written verdict from the provider of your choice, on request, code-free.</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="assets/screenshots/settings.png" alt="Settings"><br>
@@ -125,6 +129,8 @@ So we did the honest thing. We clicked the report's **"Copy as prompt"** button,
 
 > If a code-quality tool can't survive its own audit, why trust its verdict on yours? Ours did — and the whole loop (scan → *Copy as prompt* → fix → re-scan) is exactly the workflow it's built to give you.
 
+📊 **[See the measured engine benchmark →](https://ccs-benchmark.vercel.app)** — v1 vs v2 on 34 planted evidence items, both engines actually executed, fully reproducible.
+
 ---
 
 ## How it works
@@ -138,13 +144,15 @@ So we did the honest thing. We clicked the report's **"Copy as prompt"** button,
                 │                          compact, code-free summary)         │
                 └───────────────────────────────────┼──────────────────────────┘
                                                      ▼
-                                          DeepSeek API (optional)
+                              AI provider (optional) — DeepSeek / OpenAI /
+                              Claude / local Ollama
 ```
 
 1. **Scan** — the folder is walked; `node_modules`, build output, `.git`, lockfiles and generated files are ignored.
-2. **Analyze** — file/line metrics, long functions, duplication, unused imports, a dependency graph, and lightweight secret detection — all in Rust, all local.
-3. **Report** — scores, a graded verdict, and prioritized findings with evidence and refactor plans.
-4. **(Optional) Analyze with AI** — a compact summary (numbers + file paths, **never source**) goes to DeepSeek for a written report.
+2. **Analyze** — file/line metrics, long functions, **cyclomatic complexity per function**, sliding-window duplication, unused imports, a dependency graph with **cycle detection**, and **16+ secret patterns with entropy analysis** — all in Rust, all local.
+3. **Git forensics** — if the folder is a repo, the last 1000 commits are mined locally for hotspots, co-change pairs, and bus-factor risk. No repo? The report simply skips that panel.
+4. **Report** — scores (with ▲▼ trends vs your previous scan), a graded verdict, and prioritized findings with evidence and refactor plans.
+5. **(Optional) Analyze with AI** — a compact summary (numbers + file paths, **never source**) goes to your chosen provider for a written report.
 
 ---
 
@@ -168,13 +176,20 @@ npm run tauri build    # produce a standalone binary
 
 ---
 
-## Setting up the AI (DeepSeek)
+## Setting up the AI (optional)
 
-AI is **optional** — the local report works fully without a key. To unlock the written "Detective's Report":
+AI is **optional** — the local report works fully without a key. Four providers are built in:
 
-1. Create a key at **[platform.deepseek.com](https://platform.deepseek.com/) → API Keys** (it starts with `sk-…`).
-2. Open the app → **Settings → DeepSeek AI** (or paste it during onboarding).
-3. Paste the key and click **Verify & save**. The app makes a tiny real request to DeepSeek to confirm the key works, then stores it in your **OS keychain**.
+| Provider | Key from | Notes |
+|---|---|---|
+| **DeepSeek** | [platform.deepseek.com](https://platform.deepseek.com/) | default, cheapest |
+| **OpenAI** | [platform.openai.com](https://platform.openai.com/) | |
+| **Claude (Anthropic)** | [console.anthropic.com](https://console.anthropic.com/) | |
+| **Local / Custom** | — no key needed | any OpenAI-compatible server: Ollama, LM Studio, vLLM… |
+
+1. Open **Settings → AI detective** and pick your provider (or do it during onboarding).
+2. Paste the key and click **Verify & save**. The app makes a tiny real request to confirm the key works, then stores it in your **OS keychain** (one slot per provider). For **Local/Custom**, just point it at your server's base URL (e.g. `http://localhost:11434/v1`) — no key required.
+3. Optionally override the **model** per provider.
 4. Open any report → scroll to **Detective's Report** → click **Analyze with AI**.
 
 <p align="center">
@@ -182,31 +197,23 @@ AI is **optional** — the local report works fully without a key. To unlock the
 </p>
 
 **Guarantees**
-- The **"Analyze with AI"** button is hidden until a key is saved — and the backend refuses to run without one. No key ⇒ no AI call, ever.
+- The **"Analyze with AI"** button is hidden until a provider is linked — and the backend refuses to run without it. No key ⇒ no AI call, ever (local servers excepted, by your explicit choice).
 - Your **source code is never sent**. Only aggregate metrics and file paths leave the machine, and only on that explicit click.
-- The key is read **only in Rust** when calling DeepSeek; it never crosses into the web layer.
-
-> Currently the app supports **DeepSeek only**. Adding another provider is a small, well-scoped change — see below.
+- Keys are read **only in Rust** when calling the provider; they never cross into the web layer.
 
 ---
 
 ## Extending to another AI provider (open source 💚)
 
-The entire AI integration lives in **one file**: [`src-tauri/src/ai.rs`](src-tauri/src/ai.rs). It exposes exactly two functions:
+The entire AI integration lives in **one file**: [`src-tauri/src/ai.rs`](src-tauri/src/ai.rs), already housing four providers behind two functions:
 
 ```rust
-pub async fn verify_key(key: &str) -> Result<(), String>;                 // validate a key
-pub async fn analyze(key: &str, model: &str, summary: &str, lang: &str)   // get the report
-    -> Result<String, String>;
+pub async fn verify_key(provider: &str, base_url: &str, key: &str) -> Result<(), String>;
+pub async fn analyze(provider: &str, base_url: &str, key: &str,
+                     model: &str, summary: &str, lang: &str) -> Result<String, String>;
 ```
 
-To add **OpenAI, Anthropic, Gemini, Mistral, Ollama, a local model**, or any OpenAI-compatible endpoint:
-
-1. Point the request at your provider's `…/chat/completions` URL (or its SDK).
-2. Keep the same **system prompt** (`SYSTEM_PROMPT` / `SYSTEM_PROMPT_AR`) so the report format stays consistent.
-3. Map the response back to a Markdown string.
-
-Because the request body already follows the OpenAI chat schema (`model`, `messages`, `temperature`, `max_tokens`), most providers are just a **URL + auth-header swap**. The UI, key storage, language handling, and report rendering all stay the same. PRs that add providers (ideally behind a small `provider` selector in Settings) are very welcome.
+Most OpenAI-compatible services already work today via **Local / Custom** (just a base URL). To add a first-class provider (Gemini, Mistral, …): add an arm to the provider match, keep the same **system prompt** (`SYSTEM_PROMPT` / `SYSTEM_PROMPT_AR`), map the response to Markdown, and register it in the `AI_PROVIDERS` list in [`src/lib/types.ts`](src/lib/types.ts). The UI, key storage, language handling, and report rendering all stay the same. PRs welcome.
 
 ---
 
@@ -228,19 +235,26 @@ A small, modular codebase (every source file is kept under ~400 lines).
 src-tauri/src/
   analysis/        # static-analysis engine, split into focused modules
     mod.rs         #   orchestration (analyze)
-    defs.rs        #   types, patterns, responsibility tiers
+    defs.rs        #   types, patterns, responsibility tiers (incl. FiveM)
     detect.rs      #   runtime / artifact-type / responsibility detection
     metrics.rs     #   line + function metrics
-    parse.rs       #   imports, duplication, secret scanning
+    complexity.rs  #   cyclomatic complexity per function
+    lua.rs         #   Lua / FiveM: functions, requires, runtime, artifacts
+    secrets.rs     #   16+ secret patterns + Shannon-entropy detection
+    dup.rs         #   stride-1 sliding-window duplication index
+    graph.rs       #   dependency cycles (iterative Tarjan SCC)
+    parse.rs       #   imports (TS/JS/Python/Lua) + edge resolution
+  git/             # git-history forensics: hotspots, co-change, bus factor
   scanner.rs       # file-tree walking + noise classification
-  ai.rs            # DeepSeek client (the one place to add providers)
-  keychain.rs      # OS keychain access
+  ai.rs            # multi-provider AI client (DeepSeek/OpenAI/Anthropic/custom)
+  keychain.rs      # OS keychain access (one account per provider)
   db.rs            # SQLite persistence
   commands.rs      # Tauri command surface
 
 src/
   lib/             # api, scoring, findings engine (classify/refactor/verify), i18n
-  views/           # onboarding, home, report (parts/dashboard/sections), settings, cases
+  views/           # onboarding, home, report (parts/dashboard/sections/forensics),
+                   # settings (provider panel), cases
   components/      # shared UI
   styles/          # the "Forensic Noir" design system
 ```
@@ -251,10 +265,11 @@ src/
 
 ## Roadmap
 
-- [ ] Provider selector in Settings (OpenAI / Anthropic / Ollama / …)
+- [x] Provider selector in Settings (DeepSeek / OpenAI / Claude / local Ollama)
+- [x] More languages for the analyzer's heuristics — **Lua + FiveM shipped**
+- [x] Cyclomatic complexity, dependency cycles, git forensics, secrets v2, score trends
 - [ ] macOS & Linux release binaries
-- [ ] More languages for the analyzer's responsibility heuristics
-- [ ] Dependency / coupling graph visualization
+- [ ] Dependency / coupling graph **visualization** (cycle + co-change detection already in)
 - [ ] Per-rule configuration and thresholds
 
 ---

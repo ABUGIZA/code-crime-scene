@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Code Crime Scene app icon">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="78%">
+      <stop offset="0" stop-color="#1d1e25"/>
+      <stop offset="1" stop-color="#101116"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <g stroke="#E0A33A" stroke-width="50" fill="none" stroke-linecap="round">
+    <circle cx="456" cy="440" r="230"/>
+    <line x1="624" y1="606" x2="800" y2="782"/>
+  </g>
+  <g stroke="#E0A33A" stroke-width="34" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M376 372 l-70 66 l70 66"/>
+    <path d="M456 356 l-30 166"/>
+    <path d="M536 372 l70 66 l-70 66"/>
+  </g>
+</svg>
