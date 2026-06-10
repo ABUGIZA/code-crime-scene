@@ -3,10 +3,22 @@
 // plus an AI_REVIEW_BRIEF and (when relevant) QUALITY_WARNINGS.
 
 import { buildBrief, buildFindings, buildQualityWarnings } from "./findings";
-import { formatDate, formatNumber } from "./format";
+import {
+  type T,
+  mdAiContent,
+  mdBrief,
+  mdComplexity,
+  mdCycles,
+  mdFindings,
+  mdFooter,
+  mdGitForensics,
+  mdHeader,
+  mdOverview,
+  mdScores,
+  mdWarnings,
+  rationaleLine,
+} from "./report-md";
 import type { AiReviewBrief, AnalysisResult, Finding, Scores } from "./types";
-
-type T = (key: string, vars?: Record<string, string | number>) => string;
 
 export function buildAiSummary(a: AnalysisResult, scores: Scores): string {
   const lines: string[] = [];
@@ -25,19 +37,39 @@ export function buildAiSummary(a: AnalysisResult, scores: Scores): string {
     lines.push("LARGEST ANALYZED FILES:");
     a.largestFiles.slice(0, 6).forEach((f) => lines.push(`  - ${f.path} (${f.lines} lines, ${f.runtime}/${f.fileType})`));
   }
-  return lines.join("\n");
-}
 
-function rationaleLine(f: Finding, t: T): string {
-  const r = f.rationale;
-  const yn = (b: boolean) => (b ? t("val.yes") : t("val.no"));
-  return (
-    `${t("find.priorityRationale")}: ${t("rat.score")}=${r.score}/100 · ` +
-    `${t("rat.blast")}: ${t(`val.${r.blastRadius}`)} · ` +
-    `${t("rat.directIO")}: ${yn(r.directIO)} · ` +
-    `${t("rat.stateMachine")}: ${yn(r.stateMachine)} · ` +
-    `${t("rat.confidence")}: ${t(`val.${r.confidence}`)}`
-  );
+  // --- v2 evidence (every field optional — old reports omit these lines) ----
+  if (a.avgComplexity !== undefined || a.maxComplexity !== undefined || a.highComplexityFunctions !== undefined) {
+    lines.push(
+      `COMPLEXITY: avgCC=${a.avgComplexity?.toFixed(1) ?? "?"}, maxCC=${a.maxComplexity ?? "?"}, ` +
+        `functionsOverCC10=${a.highComplexityFunctions ?? "?"}`,
+    );
+  }
+  if (a.complexFunctions?.length) {
+    lines.push("MOST COMPLEX FUNCTIONS:");
+    a.complexFunctions.slice(0, 5).forEach((f) => lines.push(`  - ${f.file}:${f.startLine} ${f.name} (CC ${f.complexity}, ${f.length} lines)`));
+  }
+  if (a.cycleCount !== undefined) {
+    lines.push(`DEPENDENCY CYCLES: ${a.cycleCount}`);
+    (a.cycles ?? []).slice(0, 3).forEach((c) => lines.push(`  - ${[...c, c[0]].join(" -> ")}`));
+  }
+  const g = a.gitForensics;
+  if (g?.available) {
+    lines.push(`GIT HISTORY: commitsAnalyzed=${g.commitsAnalyzed}, authors=${g.authorsTotal}`);
+    if (g.hotspots.length) {
+      lines.push("GIT HOTSPOTS (most re-touched files):");
+      g.hotspots.slice(0, 5).forEach((h) => lines.push(`  - ${h.path} (${h.commits} commits, churn ${h.churn})`));
+    }
+    if (g.coChanges.length) {
+      lines.push("CO-CHANGED PAIRS:");
+      g.coChanges.slice(0, 3).forEach((p) => lines.push(`  - ${p.a} <-> ${p.b} (${p.count}x)`));
+    }
+    if (g.busFactor.length) {
+      lines.push("BUS FACTOR (single-author files):");
+      g.busFactor.slice(0, 3).forEach((b) => lines.push(`  - ${b.path} (${b.topAuthor} ${Math.round(b.share * 100)}% of ${b.commits} commits)`));
+    }
+  }
+  return lines.join("\n");
 }
 
 function findingBlock(f: Finding, t: T): string[] {
@@ -128,6 +160,13 @@ function warningsText(warnings: string[], t: T): string {
   return `QUALITY_WARNINGS (${t("qw.title")}):\n` + warnings.map((w) => `  - ${w}`).join("\n") + "\n";
 }
 
+function complexityEvidenceText(a: AnalysisResult): string {
+  if (!a.complexFunctions?.length) return "";
+  const lines = ["COMPLEXITY HOTSPOTS (cyclomatic complexity):"];
+  a.complexFunctions.slice(0, 5).forEach((f) => lines.push(`  - ${f.file}:${f.startLine} ${f.name} — CC ${f.complexity}, ${f.length} lines`));
+  return lines.join("\n") + "\n";
+}
+
 export function buildFixPrompt(a: AnalysisResult, scores: Scores, t: T): string {
   const findings = buildFindings(a, t);
   const brief = buildBrief(a, findings, t);
@@ -141,15 +180,9 @@ export function buildFixPrompt(a: AnalysisResult, scores: Scores, t: T): string 
     findingsText(findings, t),
     briefText(brief, t),
     "",
+    complexityEvidenceText(a),
     warningsText(warnings, t),
   ].join("\n");
-}
-
-function mdTable(headers: string[], rows: (string | number)[][]): string {
-  const head = `| ${headers.join(" | ")} |`;
-  const sep = `| ${headers.map(() => "---").join(" | ")} |`;
-  const body = rows.map((r) => `| ${r.join(" | ")} |`).join("\n");
-  return `${head}\n${sep}\n${body}`;
 }
 
 export function buildMarkdownReport(
@@ -163,110 +196,19 @@ export function buildMarkdownReport(
   const findings = buildFindings(a, t);
   const brief = buildBrief(a, findings, t);
   const warnings = buildQualityWarnings(findings, t);
-  const actionable = findings.filter((f) => f.category === "actionable");
-  const needsVerify = findings.filter((f) => f.category === "needs-verification");
-  const informational = findings.filter((f) => f.category === "informational");
-  const noise = findings.filter((f) => f.category === "noise");
 
-  const out: string[] = [];
-  out.push(`# Code Crime Scene — ${a.projectName}`);
-  out.push("");
-  out.push(`> ${formatDate(a.generatedAt)} · Grade **${grade}** (${verdictTitle}) · **${scores.projectScore}/100**`);
-  out.push(`> \`${a.projectPath}\``);
-  out.push("");
-  out.push("## Scores");
-  out.push(
-    mdTable(
-      ["Metric", "Score"],
-      [
-        ["Project Score", scores.projectScore],
-        ["Technical Debt", scores.technicalDebt],
-        ["Architecture Health", scores.architectureHealth],
-        ["Security Risk", scores.securityRisk],
-        ["Maintainability", scores.maintainability],
-      ],
-    ),
-  );
-  out.push("");
-  out.push("## Overview");
-  out.push(
-    `- Analyzed files: **${formatNumber(a.analyzedFiles)}** · Ignored noise: **${formatNumber(a.ignoredFiles)}** (${formatNumber(a.ignoredLines)} lines)\n` +
-      `- Lines of code: **${formatNumber(a.codeLines)}** · Functions: **${formatNumber(a.totalFunctions)}** · Avg file: **${a.avgFileLines.toFixed(0)}**\n` +
-      `- Security (static, limited): **${a.securityHigh}** high / **${a.securityMedium}** medium / **${a.securityLow}** low — _not a security audit_`,
-  );
-  out.push("");
-
-  out.push("## Actionable Findings");
-  if (!actionable.length) out.push("_None — clean._");
-  for (const f of actionable) {
-    out.push(`### [${f.priority}][confidence: ${f.confidence}] ${f.title} — \`${f.file}\` _(${f.runtime})_`);
-    out.push(`_${rationaleLine(f, t)}_`);
-    if (f.evidence.length) {
-      out.push(`**${t("find.evidence")}:**`);
-      f.evidence.forEach((e) => out.push(`- ${e}`));
-    }
-    if (f.why) out.push(`**${t("find.why")}:** ${f.why}`);
-    if (f.nextStep) out.push(`**${t("find.next")}:** ${f.nextStep}`);
-    if (f.refactor.length) {
-      out.push(`**${t("find.refactor")}:**`);
-      f.refactor.forEach((r) => out.push(`- \`${r.path}\` — ${r.note}`));
-    }
-    if (f.prSlices.length) {
-      out.push(`**${t("find.prs")}:**`);
-      f.prSlices.forEach((p, i) => out.push(`${i + 1}. ${p}`));
-    }
-    out.push("");
-  }
-
-  if (needsVerify.length) {
-    out.push(`## ${t("find.needsVerify")}`);
-    out.push(`_${t("find.needsVerifyNote")}_`);
-    for (const f of needsVerify) {
-      out.push(`### [${f.priority}] ${f.title} — \`${f.file}\` _(${f.runtime})_`);
-      f.verifyNotes.forEach((n) => out.push(`- ⚠ ${n}`));
-    }
-    out.push("");
-  }
-
-  if (informational.length) {
-    out.push(`## ${t("find.informational")}`);
-    out.push(`_${t("find.informationalNote")}_`);
-    informational.forEach((f) => out.push(`- \`${f.file}\` — ${f.title} (riskScore ${f.rationale.score}/100)`));
-    out.push("");
-  }
-
-  if (noise.length) {
-    out.push("## Noise / Informational");
-    noise.forEach((f) => out.push(`- \`${f.file}\` (${f.evidence[1] ?? "noise"}) — ignored for huge-file & duplication scoring`));
-    out.push("");
-  }
-
-  out.push("## AI Review Brief");
-  out.push(`**Primary risk:** ${brief.primaryRisk}`);
-  out.push("");
-  out.push("**Inspection order:**");
-  brief.inspectionOrder.forEach((it, i) => out.push(`${i + 1}. \`${it.file}\` — ${it.reason} — ${it.priority} — ${it.confidence}`));
-  if (brief.falsePositives.length) {
-    out.push("");
-    out.push("**Likely false positives — verify manually:**");
-    brief.falsePositives.forEach((fp) => out.push(`- \`${fp.file}\` — ${fp.why}`));
-  }
-  out.push("");
-
-  if (warnings.length) {
-    out.push("## Quality warnings");
-    warnings.forEach((w) => out.push(`- ${w}`));
-    out.push("");
-  }
-
-  if (aiContent) {
-    out.push("## Detective's Report (AI)");
-    out.push("");
-    out.push(aiContent);
-    out.push("");
-  }
-
-  out.push("---");
-  out.push("_Generated by Code Crime Scene — offline-first forensic code analysis._");
+  const out: string[] = [
+    ...mdHeader(a, scores, grade, verdictTitle),
+    ...mdScores(scores),
+    ...mdOverview(a),
+    ...mdFindings(findings, t),
+    ...mdComplexity(a, t),
+    ...mdCycles(a, t),
+    ...mdGitForensics(a.gitForensics, t),
+    ...mdBrief(brief),
+    ...mdWarnings(warnings),
+    ...mdAiContent(aiContent),
+    ...mdFooter(),
+  ];
   return out.join("\n");
 }

@@ -1,7 +1,8 @@
 import { useStore } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { isTauri } from "../lib/api";
-import { Fingerprint, Search, Archive, Gear } from "./Icons";
+import { Search, Archive, Gear } from "./Icons";
+import { BrandMark } from "./BrandMark";
 
 export function Sidebar() {
   const { route, navigate, hasKey } = useStore();
@@ -13,7 +14,7 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">
-          <Fingerprint size={22} />
+          <BrandMark size={22} />
         </div>
         <div className="brand-name">
           <b>CRIME</b>

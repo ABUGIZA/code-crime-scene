@@ -1,10 +1,12 @@
-// Shared DeepSeek API-key state + verify/save/remove flow, used by both the
+// Shared AI API-key state + verify/save/remove flow, used by both the
 // onboarding screen and the settings page (previously duplicated in each).
+// Provider-aware: pass the active provider (and, for "custom", its base URL).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "./store";
 import { useI18n } from "./i18n";
 import * as api from "./api";
+import { providerInfo, type AiProvider } from "./types";
 
 export type KeyStatus = "idle" | "verifying" | "ok" | "error";
 
@@ -17,12 +19,21 @@ export interface ApiKeyControl {
   remove(): Promise<void>;
 }
 
-export function useApiKey(): ApiKeyControl {
+export function useApiKey(provider: AiProvider, baseUrl?: string): ApiKeyControl {
   const { setHasKey, setNotice } = useStore();
   const { t } = useI18n();
   const [key, setKey] = useState("");
   const [status, setStatus] = useState<KeyStatus>("idle");
   const [msg, setMsg] = useState("");
+
+  const info = providerInfo(provider);
+
+  // Switching providers invalidates whatever was typed/verified for the old one.
+  useEffect(() => {
+    setKey("");
+    setStatus("idle");
+    setMsg("");
+  }, [provider]);
 
   function onChange(value: string) {
     setKey(value);
@@ -31,15 +42,18 @@ export function useApiKey(): ApiKeyControl {
   }
 
   async function verifyAndSave() {
-    if (!key.trim()) return;
+    const trimmed = key.trim();
+    // "custom" (local server) may verify with no key at all.
+    if (!trimmed && info.needsKey) return;
     setStatus("verifying");
-    setMsg(t("settings.contacting"));
+    setMsg(t("settings.contacting", { provider: t(`provider.${provider}`) }));
     try {
-      await api.verifyApiKey(key.trim());
-      await api.saveApiKey(key.trim());
+      await api.verifyApiKey(trimmed, provider, baseUrl);
+      if (trimmed) await api.saveApiKey(trimmed, provider);
+      if (provider === "custom") await api.setSetting("customLinked", "true");
       setHasKey(true);
       setStatus("ok");
-      setMsg(t("settings.verified"));
+      setMsg(trimmed ? t("settings.verified") : t("settings.verifiedNoKey"));
       setKey("");
     } catch (e) {
       setStatus("error");
@@ -49,7 +63,8 @@ export function useApiKey(): ApiKeyControl {
 
   async function remove() {
     try {
-      await api.deleteApiKey();
+      await api.deleteApiKey(provider);
+      if (provider === "custom") await api.setSetting("customLinked", "false");
       setHasKey(false);
       setStatus("idle");
       setMsg("");

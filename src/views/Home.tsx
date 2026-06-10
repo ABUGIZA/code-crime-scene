@@ -5,10 +5,11 @@ import * as api from "../lib/api";
 import type { ProjectRecord } from "../lib/types";
 import { timeAgo } from "../lib/format";
 import { Magnifier, Folder } from "../components/Icons";
+import { CaseFileArt } from "../components/EmptyArt";
 
 export function Home() {
   const { analyzePath, setNotice } = useStore();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export function Home() {
       </div>
 
       <div className="dropzone ticks" onClick={pick}>
+        <div className="case-visual" aria-hidden="true" />
         <div className="disc">
           <Magnifier size={32} />
         </div>
@@ -50,9 +52,7 @@ export function Home() {
 
         {projects.length === 0 ? (
           <div className="empty">
-            <div className="disc">
-              <Folder size={24} />
-            </div>
+            <CaseFileArt />
             {t("home.empty")}
           </div>
         ) : (
@@ -66,7 +66,7 @@ export function Home() {
                 <div className="path" dir="ltr">{p.path}</div>
               </div>
               <div className="num muted" style={{ fontSize: 12 }}>
-                {p.reportCount === 1 ? t("home.report", { n: 1 }) : t("home.reports", { n: p.reportCount })} · {timeAgo(p.lastOpened)}
+                {p.reportCount === 1 ? t("home.report", { n: 1 }) : t("home.reports", { n: p.reportCount })} · {timeAgo(p.lastOpened, lang)}
               </div>
             </div>
           ))

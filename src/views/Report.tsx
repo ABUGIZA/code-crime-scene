@@ -1,25 +1,28 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useStore } from "../lib/store";
 import { useI18n } from "../lib/i18n";
-import * as api from "../lib/api";
-import { buildAiSummary, buildFixPrompt, buildMarkdownReport } from "../lib/report";
 import { buildBrief, buildFindings, buildQualityWarnings } from "../lib/findings";
 import { gradeFor, scoreLevel } from "../lib/scoring";
+import { providerInfo } from "../lib/types";
 import type { AnalysisResult, Scores } from "../lib/types";
 import { colVar, fanIn } from "./report/parts";
 import { Dashboard, FindingsGroups } from "./report/dashboard";
 import { AiBrief, QualityWarnings, AiPanel, EvidenceTables } from "./report/sections";
+import { ComplexitySection, GitForensicsSection } from "./report/forensics";
+import { useReportActions } from "./report/useReportActions";
+import { useTrends } from "./report/useTrends";
 
 export function Report() {
-  const { current, hasKey, navigate, setAiContent, setNotice, analyzePath } = useStore();
-  const { t, lang } = useI18n();
-  const [aiLoading, setAiLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { current, hasKey, aiProvider, navigate, analyzePath } = useStore();
+  const { t } = useI18n();
+  const { aiLoading, copied, runAi, copyPrompt, exportReport } = useReportActions();
 
   const a: AnalysisResult | null = current?.analysis ?? null;
   const findings = useMemo(() => (a ? buildFindings(a, t) : []), [a, t]);
   const brief = useMemo(() => (a ? buildBrief(a, findings, t) : null), [a, findings, t]);
   const warnings = useMemo(() => (a ? buildQualityWarnings(findings, t) : []), [a, findings, t]);
+
+  const prev = useTrends(a?.projectPath ?? null, current?.reportId ?? null, current?.createdAt ?? 0);
 
   if (!current || !a) {
     return (
@@ -40,40 +43,6 @@ export function Report() {
   const informational = findings.filter((f) => f.category === "informational");
   const noise = findings.filter((f) => f.category === "noise");
 
-  async function runAi() {
-    if (!current) return;
-    setAiLoading(true);
-    try {
-      const text = await api.analyzeWithAi(buildAiSummary(current.analysis, current.scores), current.reportId, lang);
-      setAiContent(text);
-    } catch (e) {
-      setNotice(api.errText(e));
-    } finally {
-      setAiLoading(false);
-    }
-  }
-
-  async function copyPrompt() {
-    try {
-      await navigator.clipboard.writeText(buildFixPrompt(a!, s, t));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setNotice(t("copy.failed"));
-    }
-  }
-
-  async function exportReport() {
-    try {
-      const md = buildMarkdownReport(a!, s, grade, verdictTitle, t, aiContent);
-      const safe = a!.projectName.replace(/[^\w.-]+/g, "_") || "report";
-      const path = await api.saveTextFile(`${safe}-crime-scene.md`, md);
-      if (path) setNotice(t("export.saved", { path }));
-    } catch (e) {
-      setNotice(t("export.failed", { e: api.errText(e) }));
-    }
-  }
-
   return (
     <div className="content">
       <Dashboard
@@ -81,6 +50,7 @@ export function Report() {
         createdAt={current.createdAt}
         a={a}
         s={s}
+        prev={prev}
         grade={grade}
         verdictTitle={verdictTitle}
         overallCol={overallCol}
@@ -98,11 +68,14 @@ export function Report() {
         hasKey={hasKey}
         aiContent={aiContent}
         aiLoading={aiLoading}
+        providerLabel={providerInfo(aiProvider).label}
         onRun={runAi}
         onAddKey={() => navigate("settings")}
         t={t}
       />
       <EvidenceTables a={a} noise={noise} connected={connected} t={t} />
+      <ComplexitySection a={a} t={t} />
+      {a.gitForensics && <GitForensicsSection g={a.gitForensics} t={t} />}
       <div style={{ height: 30 }} />
     </div>
   );

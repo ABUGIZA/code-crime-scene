@@ -44,6 +44,15 @@ export interface LongFunction {
   language: string;
 }
 
+export interface ComplexFunction {
+  file: string;
+  name: string;
+  startLine: number;
+  length: number;
+  complexity: number; // cyclomatic complexity
+  language: string;
+}
+
 export interface DuplicationBlock {
   fingerprint: string;
   lineCount: number;
@@ -122,6 +131,60 @@ export interface AnalysisResult {
   unusedImports: UnusedImport[];
   securityFindings: SecurityFinding[];
   dependencies: DependencyEdge[];
+
+  // --- v2 fields (OPTIONAL — reports saved by older versions lack them) -----
+  avgComplexity?: number;
+  maxComplexity?: number;
+  highComplexityFunctions?: number; // count of functions with CC > 10
+  complexFunctions?: ComplexFunction[]; // top 30 by complexity, CC >= 8
+  cycleCount?: number;
+  cycles?: string[][]; // ≤20 cycles, each ≤12 file paths
+
+  // Attached by the frontend after `scan_and_analyze` (separate `git_forensics`
+  // command); persisted inside analysisJson so it round-trips with the report.
+  gitForensics?: GitForensics;
+}
+
+// --- Git forensics (Tauri command `git_forensics`) ---------------------------
+
+export interface GitFileStat {
+  path: string;
+  commits: number;
+  additions: number;
+  deletions: number;
+  authors: number;
+  lastTouchedDays: number;
+}
+
+export interface Hotspot {
+  path: string;
+  commits: number;
+  churn: number;
+  score: number;
+}
+
+export interface CoChange {
+  a: string;
+  b: string;
+  count: number;
+}
+
+export interface BusFactor {
+  path: string;
+  topAuthor: string;
+  share: number; // 0-1 share of commits by the top author
+  commits: number;
+}
+
+export interface GitForensics {
+  available: boolean;
+  reason?: string | null; // why unavailable (not a repo, git missing, …)
+  commitsAnalyzed: number;
+  authorsTotal: number;
+  files: GitFileStat[]; // top 100
+  hotspots: Hotspot[]; // top 20
+  coChanges: CoChange[]; // top 20
+  busFactor: BusFactor[]; // top 10
 }
 
 // --- Scoring (computed in TS) ----------------------------------------------
@@ -135,6 +198,18 @@ export interface Scores {
 }
 
 export type Grade = "A" | "B" | "C" | "D" | "F";
+
+// --- App navigation & the in-memory case being viewed -----------------------
+
+export type Route = "onboarding" | "home" | "analyzing" | "report" | "cases" | "settings";
+
+export interface CurrentCase {
+  analysis: AnalysisResult;
+  scores: Scores;
+  reportId: number | null;
+  createdAt: number;
+  aiContent: string | null;
+}
 
 export interface Verdict {
   grade: Grade;
@@ -188,6 +263,36 @@ export interface AiResult {
   model: string;
   generatedAt: number;
   content: string;
+  provider?: string; // "deepseek" | "openai" | "anthropic" | "custom" (absent on old reports)
+}
+
+// --- AI providers -------------------------------------------------------------
+
+export type AiProvider = "deepseek" | "openai" | "anthropic" | "custom";
+
+export interface AiProviderInfo {
+  id: AiProvider;
+  label: string;
+  defaultModel: string;
+  needsKey: boolean; // "custom" (local OpenAI-compatible server) works without one
+  hasBaseUrl: boolean; // only "custom" takes a base URL
+  keyHint: string; // input placeholder
+  keyUrl: string; // where to obtain a key ("" = not applicable)
+}
+
+export const AI_PROVIDERS: AiProviderInfo[] = [
+  { id: "deepseek", label: "DeepSeek", defaultModel: "deepseek-chat", needsKey: true, hasBaseUrl: false, keyHint: "sk-…", keyUrl: "platform.deepseek.com" },
+  { id: "openai", label: "OpenAI", defaultModel: "gpt-5.2", needsKey: true, hasBaseUrl: false, keyHint: "sk-…", keyUrl: "platform.openai.com" },
+  { id: "anthropic", label: "Claude (Anthropic)", defaultModel: "claude-sonnet-4-6", needsKey: true, hasBaseUrl: false, keyHint: "sk-ant-…", keyUrl: "console.anthropic.com" },
+  { id: "custom", label: "Local / Custom", defaultModel: "llama3.3", needsKey: false, hasBaseUrl: true, keyHint: "sk-… (optional)", keyUrl: "" },
+];
+
+export function providerInfo(id: string | null | undefined): AiProviderInfo {
+  return AI_PROVIDERS.find((p) => p.id === id) ?? AI_PROVIDERS[0];
+}
+
+export function isAiProvider(v: string | null | undefined): v is AiProvider {
+  return AI_PROVIDERS.some((p) => p.id === v);
 }
 
 // --- Findings (computed in TS from AnalysisResult) --------------------------

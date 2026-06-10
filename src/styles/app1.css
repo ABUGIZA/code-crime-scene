@@ -270,6 +270,12 @@
   border: 1px solid var(--line);
   color: var(--ink-faint);
 }
+.empty .empty-art {
+  display: block;
+  width: 134px;
+  height: auto;
+  margin: 0 auto 18px;
+}
 
 /* analyzing ---------------------------------------------------------------- */
 

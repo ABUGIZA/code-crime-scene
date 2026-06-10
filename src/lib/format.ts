@@ -27,12 +27,30 @@ export function formatDate(unixSecs: number): string {
   });
 }
 
-export function timeAgo(unixSecs: number): string {
+/// Arabic needs real unit words (dual/plural), not a tacked-on "ago".
+function arUnit(n: number, one: string, two: string, few: string, many: string): string {
+  if (n === 1) return `قبل ${one}`;
+  if (n === 2) return `قبل ${two}`;
+  if (n <= 10) return `قبل ${n} ${few}`;
+  return `قبل ${n} ${many}`;
+}
+
+export function timeAgo(unixSecs: number, lang: string = "en"): string {
   const diff = Date.now() / 1000 - unixSecs;
+  const m = Math.floor(diff / 60);
+  const h = Math.floor(diff / 3600);
+  const d = Math.floor(diff / 86400);
+  if (lang === "ar") {
+    if (diff < 60) return "الحين";
+    if (diff < 3600) return arUnit(m, "دقيقة", "دقيقتين", "دقائق", "دقيقة");
+    if (diff < 86400) return arUnit(h, "ساعة", "ساعتين", "ساعات", "ساعة");
+    if (diff < 604800) return arUnit(d, "يوم", "يومين", "أيام", "يومًا");
+    return formatDate(unixSecs);
+  }
   if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 3600) return `${m}m ago`;
+  if (diff < 86400) return `${h}h ago`;
+  if (diff < 604800) return `${d}d ago`;
   return formatDate(unixSecs);
 }
 

@@ -6,7 +6,7 @@ export const AR_UI: Dict = {
   "nav.investigate": "تحقيق",
   "nav.cases": "القضايا",
   "nav.settings": "الإعدادات",
-  "status.aiLinked": "الذكاء · DeepSeek موصول",
+  "status.aiLinked": "الذكاء · موصول",
   "status.aiOffline": "الذكاء · غير مفعّل",
   "status.storage": "التخزين · SQLite محلي",
   "status.engineNative": "المحرّك · أصلي",
@@ -67,14 +67,14 @@ export const AR_UI: Dict = {
 
   // AI panel
   "ai.title": "تقرير المحقّق",
-  "ai.subtitle": "اختياري · مدعوم بـ DeepSeek",
+  "ai.subtitle": "اختياري · مدعوم بـ {provider}",
   "ai.analyze": "حلّل بالذكاء",
   "ai.rerun": "أعِد التحليل",
-  "ai.addKey": "أضف مفتاح DeepSeek",
-  "ai.via": "نتاج تحليل DeepSeek (ذكاء اصطناعي)",
-  "ai.calling": "نتواصل مع DeepSeek…",
-  "ai.emptyLinked": "التقرير فوق محلّي (بدون نت) — بلا أي ذكاء اصطناعي. اضغط «حلّل بالذكاء» عشان نرسل لـ DeepSeek ملخّصًا مضغوطًا بلا أي كود ويعطيك قراءة أعمق. ما يطلع إلا أرقام ومسارات ملفات — كودك يبقى عندك.",
-  "ai.emptyOffline": "الذكاء اختياري. أضف مفتاح DeepSeek من الإعدادات عشان تفتح قراءة أعمق للأدلّة. التقرير المحلي فوق متاح دائمًا بدون نت.",
+  "ai.addKey": "وصّل مزوّد ذكاء",
+  "ai.via": "نتاج تحليل {provider} (ذكاء اصطناعي)",
+  "ai.calling": "نتواصل مع {provider}…",
+  "ai.emptyLinked": "التقرير فوق محلّي (بدون نت) — بلا أي ذكاء اصطناعي. اضغط «حلّل بالذكاء» عشان نرسل لـ {provider} ملخّصًا مضغوطًا بلا أي كود ويعطيك قراءة أعمق. ما يطلع إلا أرقام ومسارات ملفات — كودك يبقى عندك.",
+  "ai.emptyOffline": "الذكاء اختياري. وصّل مزوّدًا من الإعدادات عشان تفتح قراءة أعمق للأدلّة. التقرير المحلي فوق متاح دائمًا بدون نت.",
 
   // sections
   "sec.bodies": "الجثث",
@@ -91,6 +91,24 @@ export const AR_UI: Dict = {
   "sec.associates.count": "ارتباط حتى {n}",
   "dup.repeated": "تكرّر {n}× · {l} أسطر · {f} ملفات",
 
+  // complexity — interrogation room
+  "sec.interrogation": "غرفة الاستجواب",
+  "sec.interrogation.count": "{n} دالة عالية التعقيد",
+  "sec.interrogation.clean": "ولا دالة انهارت تحت الاستجواب — مسار التنفيذ هادي.",
+
+  // dependency cycles — circular evidence
+  "sec.cycles": "الدليل الدائري",
+  "sec.cycles.count": "{n} دورة",
+  "sec.cycles.none": "ما فيه دورات اعتماد — سلسلة الأدلّة كلها تمشي باتجاه واحد.",
+
+  // git forensics — the rap sheet
+  "sec.rapsheet": "صحيفة السوابق",
+  "sec.rapsheet.count": "{c} كوميت · {a} كُتّاب",
+  "sec.rapsheet.unavailable": "سجلّ Git غير متاح — {reason}",
+  "sec.rapsheet.hotspots": "أصحاب السوابق — ملفات تنلمس كل شوي",
+  "sec.rapsheet.pairs": "دايمًا مع بعض — ملفات تتغيّر كثنائي",
+  "sec.rapsheet.bus": "ملفات بشاهد واحد — كاتب واحد ماسك القصة كلها",
+
   // table headers
   "th.file": "الملف",
   "th.lang": "اللغة",
@@ -104,6 +122,22 @@ export const AR_UI: Dict = {
   "th.symbol": "الرمز",
   "th.from": "من",
   "th.importedBy": "مستورَد في",
+  "th.cc": "CC",
+  "th.length": "الطول",
+  "th.commits": "كوميتات",
+  "th.churn": "التغيير",
+  "th.heat": "السخونة",
+  "th.pair": "الثنائي",
+  "th.together": "مرات معًا",
+  "th.topAuthor": "الكاتب الأبرز",
+  "th.share": "الحصّة",
+
+  // new dashboard tiles + score trends
+  "stat.avgCC": "متوسّط التعقيد",
+  "stat.highCC": "دوال عالية التعقيد",
+  "stat.cycles": "دورات الاعتماد",
+  "stat.hotspots": "نقاط Git الساخنة",
+  "trend.vsPrev": "التغيّر عن التقرير السابق",
 
   // cases
   "cases.eyebrow": "الأرشيف",
@@ -120,16 +154,25 @@ export const AR_UI: Dict = {
   "settings.subtitle": "تحكّم بالذكاء واللغة، واعرف وين تنحفظ بياناتك.",
   "settings.lang": "اللغة",
   "settings.langDesc": "بدّل الواجهة كاملة — وردود الذكاء — بين الإنجليزي والعربي.",
-  "settings.ai": "ذكاء DeepSeek",
-  "settings.aiHasKey": "فيه مفتاح محفوظ حاليًا في خزنة نظامك الآمنة.",
-  "settings.aiNoKey": "ما فيه مفتاح. التطبيق يشتغل كامل بدون نت — المفتاح بس يفتح تقرير الذكاء الاختياري.",
-  "settings.keyLinked": "المفتاح موصول",
+  "settings.ai": "المحقّق الذكي",
+  "settings.aiHasKey": "{provider} موصول وجاهز يقرأ الأدلّة. المفاتيح تنحفظ في خزنة نظامك الآمنة.",
+  "settings.aiNoKey": "{provider} مو موصول بعد. التطبيق يشتغل كامل بدون نت — التوصيل بس يفتح تقرير الذكاء الاختياري.",
+  "settings.provider": "المزوّد",
+  "provider.deepseek": "DeepSeek",
+  "provider.openai": "OpenAI",
+  "provider.anthropic": "Claude (Anthropic)",
+  "provider.custom": "محلي / مخصّص",
+  "settings.model": "الموديل",
+  "settings.baseUrl": "عنوان الخادم (متوافق مع OpenAI)",
+  "settings.customHint": "خادم محلي (Ollama أو LM Studio أو غيره) — ما يحتاج مفتاح. «تحقّق» بس يتأكد إن الخادم يردّ.",
+  "settings.keyLinked": "{provider} موصول",
   "settings.removeKey": "احذف المفتاح",
   "settings.replaceKey": "بدّل المفتاح",
   "settings.addKey": "أضف مفتاح",
   "settings.verifySave": "تحقّق واحفظ",
-  "settings.contacting": "نتواصل مع DeepSeek…",
+  "settings.contacting": "نتواصل مع {provider}…",
   "settings.verified": "تحقّقنا من المفتاح وحفظناه في خزنة النظام.",
+  "settings.verifiedNoKey": "الخادم يردّ — اتوصلنا، وبدون أي مفتاح.",
   "settings.removed": "حُذف المفتاح من الخزنة.",
   "settings.storage": "التخزين والخصوصية",
   "settings.storageDesc": "التطبيق محلي أولًا. ما يطلع شي للنت إلا لو ضغطت «حلّل بالذكاء».",
@@ -143,15 +186,15 @@ export const AR_UI: Dict = {
   "settings.kvSource": "إرسال الكود المصدري",
   "settings.kvSourceV": "أبدًا — أرقام مجمّعة فقط",
   "settings.about": "عن التطبيق",
-  "settings.aboutText": "Code Crime Scene v0.1 — مختبر جنائي محلي لمشاريعك. كل التحليل الأساسي يصير في Rust على جهازك؛ و DeepSeek رأي ثانٍ اختياري.",
+  "settings.aboutText": "Code Crime Scene v0.1 — مختبر جنائي محلي لمشاريعك. كل التحليل الأساسي يصير في Rust على جهازك؛ والذكاء رأي ثانٍ اختياري.",
 
   // onboarding
-  "onb.lede": "مختبر جنائي محلي لكودك. كل شي يشتغل بدون نت على جهازك. الذكاء اختياري — أضف مفتاح DeepSeek عشان تستدعي محقّقًا، أو تخطَّ واشتغل على الأدلّة المحلية.",
-  "onb.keyLabel": "مفتاح DeepSeek (اختياري)",
+  "onb.lede": "مختبر جنائي محلي لكودك. كل شي يشتغل بدون نت على جهازك. الذكاء اختياري — وصّل مزوّدًا عشان تستدعي محقّقًا، أو تخطَّ واشتغل على الأدلّة المحلية.",
+  "onb.keyLabel": "مفتاح {provider} (اختياري)",
   "onb.verify": "تحقّق",
   "onb.skip": "تخطَّ — اشتغل بدون نت",
   "onb.enter": "ادخل المسرح ←",
-  "onb.hint": "المفتاح ينحفظ بس في خزنة نظامك الآمنة — لا في ملفات، ولا يترفع. ما يُرسل لـ DeepSeek إلا لمّا تطلب تحليلًا بنفسك.",
+  "onb.hint": "المفتاح ينحفظ بس في خزنة نظامك الآمنة — لا في ملفات، ولا يترفع. ما يُرسل لـ {provider} إلا لمّا تطلب تحليلًا بنفسك.",
 
 };
 

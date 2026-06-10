@@ -1,15 +1,20 @@
 ﻿// In-memory mock backend used only when running outside Tauri (browser preview).
 // Mirrors the shape of the real Rust commands so the UI behaves identically.
 
-import type {
-  AnalysisResult,
-  NewReport,
-  ProgressPayload,
-  ProjectRecord,
-  ReportRecord,
-  ReportSummary,
-} from "./types";
-import { NMSH_FILES, NMSH_NOISE } from "./mock/data";
+import type { AnalysisResult, GitForensics, NewReport, ProgressPayload, ProjectRecord, ReportRecord, ReportSummary } from "./types";
+import {
+  NMSH_COMPLEX,
+  NMSH_CYCLES,
+  NMSH_DEPENDENCIES,
+  NMSH_DUPLICATION,
+  NMSH_FILES,
+  NMSH_GIT,
+  NMSH_LANGUAGES,
+  NMSH_LONG_FUNCTIONS,
+  NMSH_NOISE,
+  NMSH_SECURITY_FINDINGS,
+  NMSH_UNUSED_IMPORTS,
+} from "./mock/data";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -17,7 +22,7 @@ const settings = new Map<string, string>();
 let reports: ReportRecord[] = [];
 let projects: ProjectRecord[] = [];
 let nextId = 1;
-let savedKey: string | null = null;
+const savedKeys = new Map<string, string>(); // provider id -> key
 
 function basename(p: string): string {
   const parts = p.replace(/\\/g, "/").split("/").filter(Boolean);
@@ -29,13 +34,13 @@ export async function pickFolder(): Promise<string | null> {
   return "/Users/mhmds/dev/nmsh-tv";
 }
 
-export function sampleAnalysis(path: string): AnalysisResult {
-  const name = basename(path);
-  return {
-    projectName: name,
-    projectPath: path,
-    generatedAt: Math.floor(Date.now() / 1000),
+// Bumps on every mock scan: a re-scan of the same project "cleans up" a little,
+// so the score-trend deltas (vs the previous report) are visible in the preview.
+let scanSeq = 0;
 
+// Fixed corpus totals — identical for every mock scan, independent of drift.
+function mkTotals() {
+  return {
     totalFiles: 541,
     scannedFiles: 213,
     skippedFiles: 328,
@@ -52,80 +57,65 @@ export function sampleAnalysis(path: string): AnalysisResult {
     totalFunctions: 412,
     avgFileLines: 81.2,
     maxFanIn: 23,
-    duplicateLineRatio: 0.064,
+  } as const;
+}
 
-    totalLongFunctions: 18,
-    totalUnusedImports: 12,
-    totalDuplicateBlocks: 27,
-    hugeFileCount: 6,
+// Drift-sensitive counts: a re-scan "cleans up" a little (d climbs 0→3), which
+// is what makes the score-trend deltas visible in the preview.
+function mkCounts(d: number) {
+  return {
+    duplicateLineRatio: Math.max(0.064 - d * 0.009, 0),
+    totalLongFunctions: Math.max(18 - d * 3, 0),
+    totalUnusedImports: Math.max(12 - d * 4, 0),
+    totalDuplicateBlocks: Math.max(27 - d * 4, 0),
+    hugeFileCount: Math.max(6 - d, 0),
     securityHigh: 1,
-    securityMedium: 3,
+    securityMedium: Math.max(3 - d, 0),
     securityLow: 0,
+  } as const;
+}
 
-    verifyCommands: ["npm run typecheck", "npm run build"],
+// v2 complexity + dependency-cycle summary (constant across scans).
+function mkComplexity() {
+  return {
+    avgComplexity: 4.6,
+    maxComplexity: 24,
+    highComplexityFunctions: 9,
+    complexFunctions: NMSH_COMPLEX,
+    cycleCount: 2,
+    cycles: NMSH_CYCLES,
+  } as const;
+}
 
-    languages: [
-      { language: "TypeScript", files: 168, lines: 12450 },
-      { language: "CSS", files: 22, lines: 3210 },
-      { language: "JSON", files: 14, lines: 842 },
-      { language: "Markdown", files: 9, lines: 802 },
-    ],
-
+// The detailed evidence collections (files, findings, dependencies).
+function mkEvidence() {
+  return {
+    languages: NMSH_LANGUAGES,
     largestFiles: NMSH_FILES.slice(0, 6),
     ignoredLargest: NMSH_NOISE,
     allFiles: NMSH_FILES,
+    longFunctions: NMSH_LONG_FUNCTIONS,
+    duplication: NMSH_DUPLICATION,
+    unusedImports: NMSH_UNUSED_IMPORTS,
+    securityFindings: NMSH_SECURITY_FINDINGS,
+    dependencies: NMSH_DEPENDENCIES,
+  } as const;
+}
 
-    longFunctions: [
-      { file: "src/store/rootReducer.ts", name: "editorReducer", startLine: 188, length: 214, language: "TypeScript" },
-      { file: "src/features/editor/Canvas.tsx", name: "handlePointerMove", startLine: 311, length: 168, language: "TypeScript" },
-      { file: "src/api/client.ts", name: "request", startLine: 96, length: 121, language: "TypeScript" },
-      { file: "src/features/auth/authSlice.ts", name: "refreshSession", startLine: 240, length: 98, language: "TypeScript" },
-      { file: "src/components/DataGrid.tsx", name: "computeLayout", startLine: 142, length: 87, language: "TypeScript" },
-      { file: "src/utils/format.ts", name: "formatRelative", startLine: 12, length: 64, language: "TypeScript" },
-    ],
+export function sampleAnalysis(path: string, drift = 0): AnalysisResult {
+  const d = Math.min(Math.max(drift, 0), 3);
+  return {
+    projectName: basename(path),
+    projectPath: path,
+    generatedAt: Math.floor(Date.now() / 1000),
 
-    duplication: [
-      {
-        fingerprint: "9af31c20e7b6d041",
-        lineCount: 6,
-        occurrences: 4,
-        files: ["src/features/editor/Toolbar.tsx", "src/features/viewer/Toolbar.tsx", "src/features/editor/Panel.tsx"],
-        sample:
-          "const handler = useCallback((e: Event) => {\nif (!ref.current) return;\nconst rect = ref.current.getBoundingClientRect();\nsetPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });\ndispatch(updatePointer(pos));\n}, [dispatch, pos]);",
-      },
-      {
-        fingerprint: "1b7740a9c3e25fd8",
-        lineCount: 6,
-        occurrences: 3,
-        files: ["src/api/users.ts", "src/api/teams.ts", "src/api/projects.ts"],
-        sample:
-          "const res = await client.get(`/v2/${resource}`);\nif (res.status !== 200) {\nthrow new ApiError(res.status, res.statusText);\n}\nreturn normalize(res.data);",
-      },
-    ],
+    ...mkTotals(),
+    ...mkCounts(d),
+    ...mkComplexity(),
 
-    unusedImports: [
-      { file: "src/features/editor/Canvas.tsx", name: "useMemo", source: "react", line: 3 },
-      { file: "src/api/client.ts", name: "AxiosError", source: "axios", line: 2 },
-      { file: "src/components/DataGrid.tsx", name: "clsx", source: "clsx", line: 8 },
-      { file: "src/utils/format.ts", name: "isToday", source: "date-fns", line: 1 },
-    ],
+    verifyCommands: ["npm run typecheck", "npm run build"],
 
-    securityFindings: [
-      { file: "src/config/firebase.ts", line: 14, kind: "Hardcoded secret", severity: "medium", snippet: 'apiKey: «redacted»,' },
-      { file: ".env.example", line: 6, kind: "Hardcoded secret", severity: "medium", snippet: 'ACCESS_TOKEN=«redacted»' },
-      { file: "scripts/deploy.ts", line: 30, kind: "Private key material", severity: "high", snippet: "-----BEGIN OPENSSH «redacted» KEY-----" },
-      { file: "src/api/client.ts", line: 51, kind: "Hardcoded secret", severity: "medium", snippet: 'clientSecret: «redacted»' },
-    ],
-
-    dependencies: [
-      { from: "src/features/editor/Canvas.tsx", to: "src/store/rootReducer.ts" },
-      { from: "src/features/editor/Toolbar.tsx", to: "src/store/rootReducer.ts" },
-      { from: "src/features/viewer/Toolbar.tsx", to: "src/store/rootReducer.ts" },
-      { from: "src/components/DataGrid.tsx", to: "src/api/client.ts" },
-      { from: "src/features/auth/authSlice.ts", to: "src/api/client.ts" },
-      { from: "src/api/users.ts", to: "src/api/client.ts" },
-      { from: "src/api/teams.ts", to: "src/api/client.ts" },
-    ],
+    ...mkEvidence(),
   };
 }
 
@@ -142,7 +132,7 @@ export async function scanAndAnalyze(
   onProgress({ phase: "analyzing", processed: 213, message: "Dusting for fingerprints…" });
   await sleep(640);
   onProgress({ phase: "done", processed: 213, message: "Case file assembled." });
-  return sampleAnalysis(path);
+  return sampleAnalysis(path, scanSeq++);
 }
 
 export async function saveReport(report: NewReport): Promise<number> {
@@ -220,21 +210,34 @@ export async function setSetting(key: string, value: string): Promise<void> {
   settings.set(key, value);
 }
 
-export async function keyExists(): Promise<boolean> {
-  return savedKey != null;
+const providerId = (provider?: string) => provider ?? "deepseek";
+
+export async function keyExists(provider?: string): Promise<boolean> {
+  return savedKeys.has(providerId(provider));
 }
 
-export async function saveApiKey(key: string): Promise<void> {
-  savedKey = key;
+export async function saveApiKey(key: string, provider?: string): Promise<void> {
+  savedKeys.set(providerId(provider), key);
 }
 
-export async function deleteApiKey(): Promise<void> {
-  savedKey = null;
+export async function deleteApiKey(provider?: string): Promise<void> {
+  savedKeys.delete(providerId(provider));
 }
 
-export async function verifyApiKey(key: string): Promise<void> {
+export async function verifyApiKey(
+  key: string,
+  provider?: string,
+  _baseUrl?: string,
+): Promise<void> {
   await sleep(700);
+  // "custom" = local OpenAI-compatible server: only reachability matters, key optional.
+  if (providerId(provider) === "custom") return;
   if (key.trim().length < 8) throw new Error("Invalid API key (unauthorized).");
+}
+
+export async function gitForensics(_path: string): Promise<GitForensics> {
+  await sleep(320);
+  return NMSH_GIT;
 }
 
 export async function analyzeWithAi(_summary: string, lang = "en"): Promise<string> {

@@ -1,10 +1,22 @@
-// Shared DeepSeek key entry field (input + verify button + status message),
+// Shared AI key entry field (input + verify button + status message),
 // used by both onboarding and settings so the markup lives in one place.
+// Placeholder comes from the provider's keyHint; `allowEmpty` lets the
+// "custom" (local server) provider verify without typing a key.
 
 import type { ApiKeyControl } from "../lib/useApiKey";
 import { Check, Alert } from "./Icons";
 
-export function ApiKeyField({ ctrl, cta }: { ctrl: ApiKeyControl; cta: string }) {
+export function ApiKeyField({
+  ctrl,
+  cta,
+  placeholder,
+  allowEmpty,
+}: {
+  ctrl: ApiKeyControl;
+  cta: string;
+  placeholder?: string;
+  allowEmpty?: boolean;
+}) {
   const { key, status, msg, onChange, verifyAndSave } = ctrl;
   return (
     <>
@@ -12,7 +24,7 @@ export function ApiKeyField({ ctrl, cta }: { ctrl: ApiKeyControl; cta: string })
         <input
           className="input"
           type="password"
-          placeholder="sk-…"
+          placeholder={placeholder ?? "sk-…"}
           value={key}
           spellCheck={false}
           dir="ltr"
@@ -22,7 +34,7 @@ export function ApiKeyField({ ctrl, cta }: { ctrl: ApiKeyControl; cta: string })
         <button
           className="btn btn-primary"
           onClick={verifyAndSave}
-          disabled={!key.trim() || status === "verifying"}
+          disabled={(!key.trim() && !allowEmpty) || status === "verifying"}
         >
           {status === "verifying" ? <span className="spinner" /> : cta}
         </button>

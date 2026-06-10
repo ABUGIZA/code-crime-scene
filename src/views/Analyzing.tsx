@@ -18,7 +18,14 @@ export function Analyzing() {
   return (
     <div className="analyzing">
       <div className="scan">
+        <div className="scan-grid" aria-hidden="true" />
         <div className="scan-disc">
+          <div className="scan-points" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
           <div className="scan-fingerprint">
             <Fingerprint size={56} />
           </div>

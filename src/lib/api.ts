@@ -6,14 +6,7 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as tauriOpen, save as tauriSave } from "@tauri-apps/plugin-dialog";
 import * as mock from "./mock";
-import type {
-  AnalysisResult,
-  NewReport,
-  ProgressPayload,
-  ProjectRecord,
-  ReportRecord,
-  ReportSummary,
-} from "./types";
+import type { AnalysisResult, GitForensics, NewReport, ProgressPayload, ProjectRecord, ReportRecord, ReportSummary } from "./types";
 
 export const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -64,6 +57,13 @@ export async function onAnalysisProgress(
 export async function scanAndAnalyze(path: string): Promise<AnalysisResult> {
   if (isTauri) return tauriInvoke<AnalysisResult>("scan_and_analyze", { path });
   return mock.scanAndAnalyze(path, (p) => mockProgressCb?.(p));
+}
+
+// --- git forensics ------------------------------------------------------------
+
+export async function gitForensics(path: string): Promise<GitForensics> {
+  if (isTauri) return tauriInvoke<GitForensics>("git_forensics", { path });
+  return mock.gitForensics(path);
 }
 
 // --- reports ----------------------------------------------------------------
@@ -124,37 +124,66 @@ export async function setSetting(key: string, value: string): Promise<void> {
 }
 
 // --- API key (OS keychain) --------------------------------------------------
+// All key commands take an optional provider id ("deepseek" | "openai" |
+// "anthropic" | "custom"); omitting it keeps the legacy DeepSeek behavior.
 
-export async function keyExists(): Promise<boolean> {
-  if (isTauri) return tauriInvoke<boolean>("key_exists");
-  return mock.keyExists();
+export async function keyExists(provider?: string): Promise<boolean> {
+  if (isTauri) return tauriInvoke<boolean>("key_exists", { provider });
+  return mock.keyExists(provider);
 }
 
-export async function saveApiKey(key: string): Promise<void> {
-  if (isTauri) return tauriInvoke("save_api_key", { key });
-  return mock.saveApiKey(key);
+export async function saveApiKey(key: string, provider?: string): Promise<void> {
+  if (isTauri) return tauriInvoke("save_api_key", { key, provider });
+  return mock.saveApiKey(key, provider);
 }
 
-export async function deleteApiKey(): Promise<void> {
-  if (isTauri) return tauriInvoke("delete_api_key");
-  return mock.deleteApiKey();
+export async function deleteApiKey(provider?: string): Promise<void> {
+  if (isTauri) return tauriInvoke("delete_api_key", { provider });
+  return mock.deleteApiKey(provider);
 }
 
-export async function verifyApiKey(key: string): Promise<void> {
-  if (isTauri) return tauriInvoke("verify_api_key", { key });
-  return mock.verifyApiKey(key);
+export async function verifyApiKey(
+  key: string,
+  provider?: string,
+  baseUrl?: string,
+): Promise<void> {
+  if (isTauri) return tauriInvoke("verify_api_key", { key, provider, baseUrl });
+  return mock.verifyApiKey(key, provider, baseUrl);
+}
+
+/** Whether the provider is usable: a key sits in the keychain, or — for
+ * "custom" (local server, key optional) — it was linked without one. */
+export async function providerLinked(provider?: string): Promise<boolean> {
+  if (await keyExists(provider)) return true;
+  if (provider === "custom") return (await getSetting("customLinked")) === "true";
+  return false;
 }
 
 // --- AI ---------------------------------------------------------------------
+
+export interface AiCallOptions {
+  model?: string;
+  provider?: string;
+  baseUrl?: string;
+}
 
 export async function analyzeWithAi(
   summary: string,
   reportId: number | null,
   lang: string = "en",
-  model = "deepseek-chat",
+  opts: AiCallOptions = {},
 ): Promise<string> {
-  if (isTauri)
-    return tauriInvoke<string>("analyze_with_ai", { summary, model, reportId, lang });
+  if (isTauri) {
+    const { model, provider, baseUrl } = opts;
+    return tauriInvoke<string>("analyze_with_ai", {
+      summary,
+      model,
+      reportId,
+      lang,
+      provider,
+      baseUrl,
+    });
+  }
   return mock.analyzeWithAi(summary, lang);
 }
 

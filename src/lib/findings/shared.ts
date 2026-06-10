@@ -99,16 +99,28 @@ export const hasDirectStateMachine = (fi: FileInfo) =>
 // Role-aware blast radius (req #2): a central hook driving WS/RTC/state or a
 // server entrypoint juggling HTTP+WS is high-impact regardless of import fan-in;
 // a presentation-only component is low; everything else falls back to fan-in.
+// fan-in → Level on the given thresholds (the common "fall back to fan-in" rule).
+const byFanIn = (fanIn: number, hi: number, med: number): Level => (fanIn >= hi ? "high" : fanIn >= med ? "medium" : "low");
+
+// Per-role blast-radius rules, tried in order. A rule returns a Level when it
+// owns the file's role, or null to fall through to the fan-in default below.
+const BLAST_RULES: ((fi: FileInfo, fanIn: number) => Level | null)[] = [
+  (fi, fanIn) => (fi.fileType === "react_icon" || fi.fileType === "react_dialog" ? (fanIn >= 12 ? "medium" : "low") : null),
+  (fi) => (fi.fileType === "node_server" && directHeavyCount(fi) >= 2 ? "high" : null),
+  (fi, fanIn) =>
+    fi.fileType === "node_service" ? (weightyDirect(fi).length >= 3 || fanIn >= 6 ? "high" : weightyDirect(fi).length >= 2 ? "medium" : "low") : null,
+  (fi) => (fi.fileType === "react_hook" && hasDirectHeavyIO(fi) && (hasDirectStateMachine(fi) || directHeavyCount(fi) >= 2) ? "high" : null),
+  (fi) => (fi.fileType === "react_root" ? (fi.responsibilities.length >= 3 ? "medium" : "low") : null),
+  (fi, fanIn) => (fi.fileType === "react_feature" ? byFanIn(fanIn, 8, 3) : null),
+];
+
 export function blastRadiusOf(fi: FileInfo): Level {
-  const ft = fi.fileType;
   const fanIn = fi.fanIn ?? 0;
-  if (ft === "react_icon" || ft === "react_dialog") return fanIn >= 12 ? "medium" : "low";
-  if (ft === "node_server" && directHeavyCount(fi) >= 2) return "high";
-  if (ft === "node_service") return weightyDirect(fi).length >= 3 || fanIn >= 6 ? "high" : weightyDirect(fi).length >= 2 ? "medium" : "low";
-  if (ft === "react_hook" && hasDirectHeavyIO(fi) && (hasDirectStateMachine(fi) || directHeavyCount(fi) >= 2)) return "high";
-  if (ft === "react_root") return fi.responsibilities.length >= 3 ? "medium" : "low";
-  if (ft === "react_feature") return fanIn >= 8 ? "high" : fanIn >= 3 ? "medium" : "low";
-  return fanIn >= 10 ? "high" : fanIn >= 4 ? "medium" : "low";
+  for (const rule of BLAST_RULES) {
+    const level = rule(fi, fanIn);
+    if (level !== null) return level;
+  }
+  return byFanIn(fanIn, 10, 4);
 }
 
 // --- Evidence (with line numbers + one-line snippets, req #4 & #5) ----------

@@ -17,6 +17,18 @@ export function computeScores(a: AnalysisResult): Scores {
   const coupling = a.maxFanIn;
   const avg = a.avgFileLines;
 
+  // --- v2 inputs (all OPTIONAL on AnalysisResult) ----------------------------
+  // Reports saved before the complexity/cycle analyzer shipped lack these
+  // fields, so every v2 penalty is guarded: when a field is undefined the
+  // formula collapses to the original v1 score, bit for bit.
+  //   highShare       share of functions with cyclomatic complexity > 10
+  //   avgComplexity   mean cyclomatic complexity across functions
+  //   cycleCount      number of dependency cycles found in the import graph
+  const highShare =
+    (a.highComplexityFunctions ?? undefined) !== undefined && a.totalFunctions > 0
+      ? a.highComplexityFunctions! / a.totalFunctions
+      : undefined;
+
   // Maintainability — how easy it is to read and safely change the code.
   let m = 100;
   m -= clamp(longRatio * 180, 0, 34);
@@ -24,6 +36,9 @@ export function computeScores(a: AnalysisResult): Scores {
   m -= clamp(huge * 2.2, 0, 18);
   if (commentRatio < 0.04) m -= 8;
   m -= clamp(dup * 60, 0, 18);
+  if (highShare !== undefined) m -= clamp(highShare * 140, 0, 20);
+  if (a.avgComplexity !== undefined && a.avgComplexity > 6)
+    m -= clamp((a.avgComplexity - 6) * 3, 0, 12);
   const maintainability = clamp(round(m), 0, 100);
 
   // Technical Debt — duplication, long functions, dead imports.
@@ -32,6 +47,7 @@ export function computeScores(a: AnalysisResult): Scores {
   d -= clamp(longRatio * 160, 0, 30);
   d -= clamp(unusedPerKloc * 6, 0, 16);
   d -= clamp(huge * 1.5, 0, 14);
+  if (highShare !== undefined) d -= clamp(highShare * 120, 0, 18);
   const technicalDebt = clamp(round(d), 0, 100);
 
   // Architecture Health — coupling and module-size distribution.
@@ -40,6 +56,7 @@ export function computeScores(a: AnalysisResult): Scores {
   ar -= clamp(huge * 2.5, 0, 24);
   ar -= clamp((avg - 160) / 10, 0, 16);
   ar -= clamp(dup * 50, 0, 14);
+  if (a.cycleCount !== undefined) ar -= clamp(a.cycleCount * 4, 0, 20);
   const architectureHealth = clamp(round(ar), 0, 100);
 
   // Security Risk — framed as safety: fewer secrets => higher score.

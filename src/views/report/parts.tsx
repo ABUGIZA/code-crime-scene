@@ -47,13 +47,31 @@ export function Gauge({ score }: { score: number }) {
   );
 }
 
-export function Metric({ name, value }: { name: string; value: number }) {
+/** Small ▲+n / ▼−n score-trend badge (higher is better for every score).
+ *  Renders nothing for a zero delta — "no change" is not evidence. */
+export function Delta({ d, label }: { d: number; label: string }) {
+  if (!d) return null;
+  const up = d > 0;
+  return (
+    <span
+      className={`mono ${up ? "t-good" : "t-bad"}`}
+      style={{ fontSize: 11, fontWeight: 650, whiteSpace: "nowrap" }}
+      title={label}
+      dir="ltr"
+    >
+      {up ? `▲+${d}` : `▼−${Math.abs(d)}`}
+    </span>
+  );
+}
+
+export function Metric({ name, value, delta, deltaLabel }: { name: string; value: number; delta?: number; deltaLabel?: string }) {
   const col = colVar(scoreLevel(value));
   return (
     <div className="card metric">
       <div className="metric-top">
         <span className="metric-name">{name}</span>
-        <span className="metric-val" style={{ color: col }}>
+        <span className="metric-val" style={{ color: col, display: "inline-flex", alignItems: "baseline", gap: 7 }}>
+          {delta !== undefined && <Delta d={delta} label={deltaLabel ?? ""} />}
           {value}
         </span>
       </div>
