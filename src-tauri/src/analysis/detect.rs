@@ -1,29 +1,74 @@
 ﻿use super::defs::*;
 use crate::models::Responsibility;
 
+// Artifact typing lives in `artifact.rs`; re-exported so callers keep using
+// `detect::*` unchanged.
+pub(crate) use super::artifact::{detect_artifact_type, find_decl_line, primary_symbol};
+
+/// Which runtime flag a matched rule raises (index into the flag array).
+#[derive(Clone, Copy)]
+enum Signal {
+    PathServer = 0,
+    PathClient = 1,
+    NodeServer = 2,
+    React = 3,
+}
+
+/// Where a runtime rule's token is matched.
+#[derive(Clone, Copy)]
+enum Probe {
+    PathContains,
+    PathStartsWith,
+    ContentContains,
+}
+
+/// Ordered rule table for runtime detection: (probe, token) -> signal.
+/// Path signals win over content; React evidence vetoes Node-server evidence
+/// (see the decision at the end of `detect_runtime`).
+const RUNTIME_RULES: &[(Probe, &str, Signal)] = &[
+    (Probe::PathContains, "server/", Signal::PathServer),
+    (Probe::PathContains, "backend/", Signal::PathServer),
+    (Probe::PathStartsWith, "api/", Signal::PathServer),
+    (Probe::PathContains, "/functions/", Signal::PathServer),
+    (Probe::PathContains, "client/", Signal::PathClient),
+    (Probe::PathContains, "frontend/", Signal::PathClient),
+    (Probe::PathContains, "/web/", Signal::PathClient),
+    (Probe::PathContains, "src/components/", Signal::PathClient),
+    (Probe::PathContains, "src/hooks/", Signal::PathClient),
+    (Probe::PathContains, "src/pages/", Signal::PathClient),
+    (Probe::PathContains, "src/app", Signal::PathClient),
+    (Probe::ContentContains, "http.createServer", Signal::NodeServer),
+    (Probe::ContentContains, "createServer(", Signal::NodeServer),
+    (Probe::ContentContains, "express(", Signal::NodeServer),
+    (Probe::ContentContains, "WebSocketServer", Signal::NodeServer),
+    (Probe::ContentContains, "app.listen", Signal::NodeServer),
+    (Probe::ContentContains, "require('http')", Signal::NodeServer),
+    (Probe::ContentContains, "from \"http\"", Signal::NodeServer),
+    (Probe::ContentContains, "from \"react\"", Signal::React),
+    (Probe::ContentContains, "from 'react'", Signal::React),
+    (Probe::ContentContains, "react-dom", Signal::React),
+    (Probe::ContentContains, "useState(", Signal::React),
+    (Probe::ContentContains, "useEffect(", Signal::React),
+    (Probe::ContentContains, "/>", Signal::React),
+];
+
 pub(crate) fn detect_runtime(rel_path: &str, content: &str) -> String {
     let p = rel_path.to_ascii_lowercase();
-    let path_server = p.contains("server/") || p.contains("backend/") || p.starts_with("api/") || p.contains("/functions/");
-    let path_client = p.contains("client/")
-        || p.contains("frontend/")
-        || p.contains("/web/")
-        || p.contains("src/components/")
-        || p.contains("src/hooks/")
-        || p.contains("src/pages/")
-        || p.contains("src/app");
-    let node_server = content.contains("http.createServer")
-        || content.contains("createServer(")
-        || content.contains("express(")
-        || content.contains("WebSocketServer")
-        || content.contains("app.listen")
-        || content.contains("require('http')")
-        || content.contains("from \"http\"");
-    let reactish = content.contains("from \"react\"")
-        || content.contains("from 'react'")
-        || content.contains("react-dom")
-        || content.contains("useState(")
-        || content.contains("useEffect(")
-        || content.contains("/>");
+    let mut flags = [false; 4];
+    for (probe, token, signal) in RUNTIME_RULES {
+        let hit = match probe {
+            Probe::PathContains => p.contains(token),
+            Probe::PathStartsWith => p.starts_with(token),
+            Probe::ContentContains => content.contains(token),
+        };
+        if hit {
+            flags[*signal as usize] = true;
+        }
+    }
+    let path_server = flags[Signal::PathServer as usize];
+    let path_client = flags[Signal::PathClient as usize];
+    let node_server = flags[Signal::NodeServer as usize];
+    let reactish = flags[Signal::React as usize];
     if path_server || (node_server && !reactish) {
         return "server".into();
     }
@@ -43,6 +88,15 @@ pub(crate) fn is_jsts(lang: &str) -> bool {
 /// only appear inside comments (`// reconnect`) or string literals (a pattern
 /// table like `pats: &["new WebSocketServer"]`, or a translation value).
 pub(crate) fn sanitize(content: &str, blank_strings: bool) -> String {
+    strip_c_like(content, &['\'', '"', '`'], blank_strings)
+}
+
+/// Shared C-style stripping state machine: blank `//` and `/* */` comments;
+/// any char in `quotes` opens a string literal. Newlines always survive so
+/// line numbers stay aligned. Used by `sanitize` above (JS/TS quotes) and by
+/// the Rust view in `analysis::complexity` (where `'` is NOT a string opener —
+/// char literals and lifetimes).
+pub(crate) fn strip_c_like(content: &str, quotes: &[char], blank_strings: bool) -> String {
     enum S {
         Code,
         Line,
@@ -66,7 +120,7 @@ pub(crate) fn sanitize(content: &str, blank_strings: bool) -> String {
                     out.push(' ');
                     chars.next();
                     st = S::Block;
-                } else if c == '\'' || c == '"' || c == '`' {
+                } else if quotes.contains(&c) {
                     out.push(c);
                     esc = false;
                     st = S::Str(c);
@@ -119,16 +173,22 @@ pub(crate) fn sanitize(content: &str, blank_strings: bool) -> String {
 pub(crate) fn code_view(content: &str, lang: &str) -> String {
     if is_jsts(lang) {
         sanitize(content, false)
+    } else if lang == "Lua" {
+        super::lua::sanitize_lua(content, false)
     } else {
         content.to_string()
     }
 }
 
 /// Comment- AND string-free view — for responsibility matching, where a real API
-/// usage is always code, never a string literal or a translation value.
+/// usage is always code, never a string literal or a translation value. Lua keeps
+/// strings: FiveM evidence legitimately includes quoted export names like
+/// `exports['oxmysql']`.
 pub(crate) fn code_for_resp(content: &str, lang: &str) -> String {
     if is_jsts(lang) {
         sanitize(content, true)
+    } else if lang == "Lua" {
+        super::lua::sanitize_lua(content, false)
     } else {
         content.to_string()
     }
@@ -196,136 +256,23 @@ pub(crate) fn detect_one(content: &str, kind: &str, tiers: &[Tier]) -> Option<Re
 pub(crate) fn detect_responsibilities(content: &str, lang: &str) -> Vec<Responsibility> {
     // The responsibility patterns are JS/TS idioms. Running them on Rust/JSON/etc.
     // only ever produces false positives (a Rust file that *defines* the patterns
-    // as string literals is not a WebSocket server).
-    if !is_jsts(lang) {
+    // as string literals is not a WebSocket server). Lua files run only the
+    // fivem_* tiers; JS/TS files run everything (FiveM also has a JS runtime).
+    let is_lua = lang == "Lua";
+    if !is_jsts(lang) && !is_lua {
         return Vec::new();
     }
     let mut out: Vec<Responsibility> = Vec::new();
     for (kind, tiers) in RESP_DEFS {
+        if is_lua && !kind.starts_with("fivem_") {
+            continue;
+        }
         if let Some(r) = detect_one(content, kind, tiers) {
             out.push(r);
         }
     }
     out
 }
-
-/// Classify a file into a context-aware artifact type. Server-only artifacts
-/// (node_server, route_handler) REQUIRE a server runtime — a client component
-/// can never be labelled a server entrypoint.
-pub(crate) fn detect_artifact_type(
-    rel_path: &str,
-    lang: &str,
-    ext: &str,
-    runtime: &str,
-    resp: &[Responsibility],
-    content: &str,
-) -> String {
-    let name = rel_path.rsplit('/').next().unwrap_or(rel_path);
-    let stem = name.rsplit_once('.').map(|(s, _)| s).unwrap_or(name);
-    let lower_name = name.to_ascii_lowercase();
-    let lower_stem = stem.to_ascii_lowercase();
-    let is_ts_js = matches!(lang, "TypeScript" | "JavaScript");
-    let is_tsx = ext == "tsx" || ext == "jsx";
-    let has = |k: &str| resp.iter().any(|r| r.kind == k);
-
-    if !is_ts_js {
-        if lower_name.contains(".config.") {
-            return "config".into();
-        }
-        return "other".into();
-    }
-    if lower_name.ends_with(".d.ts") || lower_name == "types.ts" || lower_name.ends_with(".types.ts") {
-        return "types".into();
-    }
-    if lower_name.contains(".config.") {
-        return "config".into();
-    }
-    // React hook — name-based, unambiguous.
-    if stem.starts_with("use") && stem.len() > 3 && stem.as_bytes()[3].is_ascii_uppercase() {
-        return "react_hook".into();
-    }
-    // Server-only artifacts — gated on server runtime (a client file can never be one).
-    if runtime == "server" {
-        let is_entry = matches!(lower_stem.as_str(), "index" | "server" | "app" | "main");
-        if has("http_server") && is_entry {
-            return "node_server".into();
-        }
-        if has("routes") {
-            return "route_handler".into();
-        }
-        if has("http_server") {
-            return "node_server".into();
-        }
-        // A server module (not an entrypoint) that bundles >=2 direct
-        // responsibilities is a service module worth splitting — give it a real
-        // reason instead of "large file".
-        let direct_count = resp.iter().filter(|r| r.evidence == "direct").count();
-        if direct_count >= 2 {
-            return "node_service".into();
-        }
-    }
-    // Name-based component types. These MUST precede the content-heuristic icon
-    // check below, so a dialog that merely renders inline SVG icons (and a
-    // `switch`) is never mis-stolen by the icon branch.
-    if is_tsx
-        && (lower_name.contains("dialog")
-            || lower_name.contains("modal")
-            || lower_name.contains("drawer")
-            || lower_name.contains("sheet"))
-    {
-        return "react_dialog".into();
-    }
-    if is_tsx && lower_name.contains("icon") {
-        return "react_icon".into();
-    }
-    if is_tsx && matches!(lower_stem.as_str(), "app" | "root" | "main") {
-        return "react_root".into();
-    }
-    // Content-heuristic icon: a presentation-only SVG switch. Only when nothing
-    // else claimed the file AND it carries NO responsibilities (no IO/state) —
-    // an SVG-heavy component that fetches or opens sockets is not an icon file.
-    let svg_count = content.matches("<svg").count() + content.matches("<path").count();
-    if is_tsx && svg_count >= 6 && content.contains("switch") && resp.is_empty() {
-        return "react_icon".into();
-    }
-    if is_tsx && (has("admin") || has("data_fetching") || has("state_machine")) {
-        return "react_feature".into();
-    }
-    if is_tsx {
-        return "react_component".into();
-    }
-    "utility".into()
-}
-
-/// The file's primary exported symbol: a hook/PascalCase component takes its name
-/// from the file stem; otherwise fall back to the longest function's name.
-pub(crate) fn primary_symbol(stem: &str, longest_name: &str) -> String {
-    let b = stem.as_bytes();
-    let is_hook = stem.len() > 3 && stem.starts_with("use") && b[3].is_ascii_uppercase();
-    let is_pascal = b.first().map(|c| c.is_ascii_uppercase()).unwrap_or(false);
-    if is_hook || is_pascal {
-        stem.to_string()
-    } else if !longest_name.is_empty() {
-        longest_name.to_string()
-    } else {
-        stem.to_string()
-    }
-}
-
-/// 1-based line where `name` is declared (function/const/let/var/class), or 0.
-pub(crate) fn find_decl_line(content: &str, name: &str) -> usize {
-    if name.is_empty() {
-        return 0;
-    }
-    for kw in ["function ", "const ", "let ", "var ", "class "] {
-        let needle = format!("{kw}{name}");
-        if let Some(off) = find_token(content, &needle) {
-            return line_index(content, off) + 1;
-        }
-    }
-    0
-}
-
 
 pub(crate) fn clean_ident(s: &str) -> String {
     s.trim()

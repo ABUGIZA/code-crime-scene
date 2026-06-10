@@ -1,8 +1,9 @@
 //! File scanning layer: walk the project tree, ignore noise directories,
-//! and read recognized source/text files into memory for analysis.
+//! respect the scanned project's own .gitignore rules, and read recognized
+//! source/text files into memory for analysis.
 
+use ignore::{DirEntry, WalkBuilder};
 use std::path::Path;
-use walkdir::{DirEntry, WalkDir};
 
 /// A single text file that survived scanning, with its content loaded.
 pub struct RawFile {
@@ -107,6 +108,8 @@ pub fn language_for_ext(ext: &str) -> Option<&'static str> {
         "md" | "mdx" => "Markdown",
         "sh" | "bash" | "zsh" => "Shell",
         "sql" => "SQL",
+        "cfg" => "Config", // FiveM server.cfg etc. — scanned for secrets only
+
         _ => return None,
     };
     Some(lang)
@@ -117,7 +120,7 @@ fn is_ignored_dir(entry: &DirEntry) -> bool {
     if entry.depth() == 0 {
         return false;
     }
-    if entry.file_type().is_dir() {
+    if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
         if let Some(name) = entry.file_name().to_str() {
             if IGNORED_DIRS.contains(&name) {
                 return true;
@@ -133,22 +136,33 @@ fn is_ignored_dir(entry: &DirEntry) -> bool {
 
 /// Walk `root`, returning all recognized text files with content loaded.
 /// `on_progress` is invoked periodically with the running count of read files.
+///
+/// Files ignored by the scanned project's own .gitignore / .git/info/exclude
+/// are skipped (only when the root is inside a git repo). Ignore rules from
+/// directories ABOVE the root are deliberately NOT inherited, so scanning a
+/// gitignored folder directly still sees its files.
 pub fn scan_dir(root: &Path, on_progress: &mut dyn FnMut(usize)) -> ScanOutput {
     let mut files: Vec<RawFile> = Vec::new();
     let mut total_seen = 0usize;
     let mut skipped = 0usize;
 
-    let walker = WalkDir::new(root)
+    let walker = WalkBuilder::new(root)
         .follow_links(false)
-        .into_iter()
-        .filter_entry(|e| !is_ignored_dir(e));
+        .git_ignore(true) // respect the project's .gitignore files (nested too)
+        .git_exclude(true) // respect .git/info/exclude
+        .git_global(false) // never the user's machine-global gitignore
+        .ignore(false) // git rules only — no generic .ignore files
+        .parents(false) // no rules inherited from above the chosen root
+        .hidden(false) // hidden-dir filtering stays ours (filter_entry below)
+        .filter_entry(|e| !is_ignored_dir(e))
+        .build();
 
     for entry in walker {
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue,
         };
-        if !entry.file_type().is_file() {
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
             continue;
         }
         total_seen += 1;
@@ -216,5 +230,46 @@ pub fn scan_dir(root: &Path, on_progress: &mut dyn FnMut(usize)) -> ScanOutput {
         files,
         total_seen,
         skipped,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn repo_root() -> std::path::PathBuf {
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        manifest.parent().unwrap_or(manifest).to_path_buf()
+    }
+
+    // Scanning the repo root must respect its .gitignore: the planted trap
+    // fixture (bench/trap/) is gitignored and must never leak into results,
+    // while real tracked sources are still found.
+    #[test]
+    fn scan_respects_repo_gitignore() {
+        let root = repo_root();
+        let mut sink = |_n: usize| {};
+        let scan = scan_dir(&root, &mut sink);
+        assert!(
+            !scan.files.iter().any(|f| f.rel_path.starts_with("bench/trap/")),
+            "gitignored bench/trap/ files must be skipped when scanning the repo root"
+        );
+        assert!(
+            scan.files.iter().any(|f| f.rel_path == "src/lib/api.ts"),
+            "real tracked sources must still be scanned"
+        );
+    }
+
+    // Scanning a gitignored folder DIRECTLY must still see its files:
+    // ignore rules from above the chosen root are not inherited.
+    #[test]
+    fn scan_direct_trap_root_sees_its_files() {
+        let trap = repo_root().join("bench").join("trap");
+        assert!(trap.is_dir(), "trap fixture missing at {:?}", trap);
+        let mut sink = |_n: usize| {};
+        let scan = scan_dir(&trap, &mut sink);
+        let has = |p: &str| scan.files.iter().any(|f| f.rel_path == p);
+        assert!(has("server.cfg"), "direct scan must see server.cfg");
+        assert!(has("client.lua"), "direct scan must see client.lua");
     }
 }

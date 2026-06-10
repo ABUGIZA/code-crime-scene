@@ -1,12 +1,8 @@
 ﻿use super::defs::*;
-use super::metrics::*;
 use super::detect::*;
-use crate::models::{SecurityFinding, UnusedImport};
+use super::lua::parse_lua_requires;
 use crate::scanner::RawFile;
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use regex::Regex;
+use std::collections::HashSet;
 
 pub(crate) fn extract_verify_commands(files: &[RawFile]) -> Vec<String> {
     let pkg = files
@@ -48,6 +44,7 @@ pub(crate) fn parse_imports(content: &str, lang: &str, pats: &Patterns) -> Vec<I
     match lang {
         "TypeScript" | "JavaScript" | "Vue" | "Svelte" => parse_ts_imports(content, pats),
         "Python" => parse_py_imports(content, pats),
+        "Lua" => parse_lua_requires(content, pats),
         _ => Vec::new(),
     }
 }
@@ -225,123 +222,5 @@ pub(crate) fn resolve_relative(importer: &str, source: &str, fileset: &HashSet<&
     }
     None
 }
-
-// ---------------------------------------------------------------------------
-// Duplication
-// ---------------------------------------------------------------------------
-
-pub(crate) fn accumulate_duplication(f: &RawFile, map: &mut HashMap<u64, DupAcc>) {
-    let norm: Vec<String> = f
-        .content
-        .lines()
-        .filter_map(|l| normalize_code_line(l, &f.language))
-        .collect();
-    if norm.len() < DUP_WINDOW {
-        return;
-    }
-    let mut i = 0;
-    while i + DUP_WINDOW <= norm.len() {
-        let window = &norm[i..i + DUP_WINDOW];
-        let fp = hash_window(window);
-        let acc = map.entry(fp).or_insert_with(|| DupAcc {
-            line_count: DUP_WINDOW,
-            occurrences: 0,
-            files: Vec::new(),
-            sample: window.join("\n"),
-        });
-        acc.occurrences += 1;
-        if !acc.files.iter().any(|x| x == &f.rel_path) {
-            acc.files.push(f.rel_path.clone());
-        }
-        i += DUP_WINDOW; // non-overlapping windows
-    }
-}
-
-pub(crate) fn normalize_code_line(raw: &str, lang: &str) -> Option<String> {
-    let t = raw.trim();
-    if t.is_empty() || is_comment_start(t, lang) {
-        return None;
-    }
-    let alnum = t.chars().filter(|c| c.is_alphanumeric()).count();
-    if alnum < 3 {
-        return None;
-    }
-    let collapsed = t.split_whitespace().collect::<Vec<_>>().join(" ");
-    if collapsed.len() < 12 {
-        return None;
-    }
-    Some(collapsed)
-}
-
-pub(crate) fn hash_window(window: &[String]) -> u64 {
-    let mut h = DefaultHasher::new();
-    for l in window {
-        l.hash(&mut h);
-        0xFFu8.hash(&mut h);
-    }
-    h.finish()
-}
-
-// ---------------------------------------------------------------------------
-// Secret detection
-// ---------------------------------------------------------------------------
-
-pub(crate) fn scan_security(path: &str, content: &str, pats: &Patterns, out: &mut Vec<SecurityFinding>) {
-    for (idx, line) in content.lines().enumerate() {
-        if line.len() > 400 {
-            continue; // skip minified / data lines
-        }
-        if pats.sec_private_key.is_match(line) {
-            out.push(make_finding(path, idx, "Private key material", "high", line, ""));
-        } else if let Some(m) = pats.sec_aws.find(line) {
-            out.push(make_finding(
-                path,
-                idx,
-                "AWS access key",
-                "high",
-                line,
-                m.as_str(),
-            ));
-        } else if let Some(caps) = pats.sec_assign.captures(line) {
-            let val = caps.get(2).map(|x| x.as_str()).unwrap_or("");
-            out.push(make_finding(path, idx, "Hardcoded secret", "medium", line, val));
-        }
-    }
-}
-
-pub(crate) fn make_finding(
-    path: &str,
-    idx: usize,
-    kind: &str,
-    severity: &str,
-    line: &str,
-    secret: &str,
-) -> SecurityFinding {
-    let masked = if secret.is_empty() {
-        line.trim().to_string()
-    } else {
-        line.trim().replace(secret, "«redacted»")
-    };
-    SecurityFinding {
-        file: path.to_string(),
-        line: idx + 1,
-        kind: kind.to_string(),
-        severity: severity.to_string(),
-        snippet: truncate(&masked, 160),
-    }
-}
-
-pub(crate) fn severity_rank(s: &str) -> u8 {
-    match s {
-        "high" => 0,
-        "medium" => 1,
-        "low" => 2,
-        _ => 3,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Small text helpers
-// ---------------------------------------------------------------------------
 
 

@@ -63,6 +63,18 @@ pub struct LongFunction {
     pub language: String,
 }
 
+/// A function whose cyclomatic complexity is worth surfacing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComplexFunction {
+    pub file: String,
+    pub name: String,
+    pub start_line: usize, // 1-based
+    pub length: usize,
+    pub complexity: usize,
+    pub language: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DuplicationBlock {
@@ -142,6 +154,14 @@ pub struct AnalysisResult {
     pub security_medium: usize,
     pub security_low: usize,
 
+    // Cyclomatic complexity over all analyzed functions.
+    pub avg_complexity: f64,
+    pub max_complexity: usize,
+    /// Functions with CC > HIGH_CC_THRESHOLD (10).
+    pub high_complexity_functions: usize,
+    /// Dependency cycles (SCCs with >= 2 files) in the import graph.
+    pub cycle_count: usize,
+
     /// Verification commands discovered in the project's package.json scripts
     /// (e.g. "npm run typecheck", "npm run build") — attached to PR suggestions.
     pub verify_commands: Vec<String>,
@@ -155,6 +175,10 @@ pub struct AnalysisResult {
     pub unused_imports: Vec<UnusedImport>,
     pub security_findings: Vec<SecurityFinding>,
     pub dependencies: Vec<DependencyEdge>,
+    /// Top complex functions (CC >= 8), highest first, capped at 30.
+    pub complex_functions: Vec<ComplexFunction>,
+    /// Up to 20 dependency cycles (largest first), each capped at 12 paths.
+    pub cycles: Vec<Vec<String>>,
 }
 
 /// A persisted report row (analysis + frontend-computed scores + optional AI text).

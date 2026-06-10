@@ -1,118 +1,13 @@
-﻿use super::defs::*;
+//! Function detection and sizing: regex hits per language, brace/indent/keyword
+//! block measurement, and statement-bounded measurement for JS/TS expression
+//! arrows (line classification lives in `lines.rs`).
+
+use super::defs::*;
 use super::detect::line_index;
 use regex::Regex;
 
-pub(crate) fn comment_tokens(lang: &str) -> CommentTokens {
-    match lang {
-        "Rust" | "TypeScript" | "JavaScript" | "Java" | "C" | "C++" | "C#" | "Go" | "Kotlin"
-        | "Swift" | "PHP" | "Scala" | "Dart" | "Vue" | "Svelte" => CommentTokens {
-            line: Some("//"),
-            block_open: Some("/*"),
-            block_close: Some("*/"),
-        },
-        "CSS" => CommentTokens {
-            line: None,
-            block_open: Some("/*"),
-            block_close: Some("*/"),
-        },
-        "Python" | "Shell" | "YAML" | "TOML" => CommentTokens {
-            line: Some("#"),
-            block_open: None,
-            block_close: None,
-        },
-        "Ruby" => CommentTokens {
-            line: Some("#"),
-            block_open: Some("=begin"),
-            block_close: Some("=end"),
-        },
-        "Lua" => CommentTokens {
-            line: Some("--"),
-            block_open: Some("--[["),
-            block_close: Some("]]"),
-        },
-        "SQL" => CommentTokens {
-            line: Some("--"),
-            block_open: Some("/*"),
-            block_close: Some("*/"),
-        },
-        "HTML" | "Markdown" => CommentTokens {
-            line: None,
-            block_open: Some("<!--"),
-            block_close: Some("-->"),
-        },
-        _ => CommentTokens {
-            line: None,
-            block_open: None,
-            block_close: None,
-        },
-    }
-}
-
-/// Returns (total, blank, comment) line counts.
-pub(crate) fn classify_lines(content: &str, lang: &str) -> (usize, usize, usize) {
-    let cc = comment_tokens(lang);
-    let mut total = 0usize;
-    let mut blank = 0usize;
-    let mut comment = 0usize;
-    let mut in_block = false;
-
-    for raw in content.lines() {
-        total += 1;
-        let t = raw.trim();
-        if t.is_empty() {
-            blank += 1;
-            continue;
-        }
-        if in_block {
-            comment += 1;
-            if let Some(close) = cc.block_close {
-                if t.contains(close) {
-                    in_block = false;
-                }
-            }
-            continue;
-        }
-        let mut is_comment = false;
-        if let Some(line_tok) = cc.line {
-            if t.starts_with(line_tok) {
-                is_comment = true;
-            }
-        }
-        if !is_comment {
-            if let (Some(open), Some(close)) = (cc.block_open, cc.block_close) {
-                if t.starts_with(open) {
-                    is_comment = true;
-                    let rest = &t[open.len().min(t.len())..];
-                    if !rest.contains(close) {
-                        in_block = true;
-                    }
-                }
-            }
-        }
-        if is_comment {
-            comment += 1;
-        }
-    }
-    (total, blank, comment)
-}
-
-pub(crate) fn is_comment_start(t: &str, lang: &str) -> bool {
-    let c = comment_tokens(lang);
-    if let Some(l) = c.line {
-        if t.starts_with(l) {
-            return true;
-        }
-    }
-    if let Some(o) = c.block_open {
-        if t.starts_with(o) {
-            return true;
-        }
-    }
-    false
-}
-
 // ---------------------------------------------------------------------------
-// Function detection & sizing
+// Function detection
 // ---------------------------------------------------------------------------
 
 pub(crate) fn detect_functions(content: &str, lang: &str, pats: &Patterns) -> Vec<FuncHit> {
@@ -121,10 +16,15 @@ pub(crate) fn detect_functions(content: &str, lang: &str, pats: &Patterns) -> Ve
         "Rust" => collect_hits(&pats.rust_fn, content, &mut hits),
         "TypeScript" | "JavaScript" | "Vue" | "Svelte" => {
             collect_hits(&pats.ts_func_function, content, &mut hits);
-            collect_hits(&pats.ts_func_arrow, content, &mut hits);
+            collect_arrow_hits(&pats.ts_func_arrow, content, &mut hits);
         }
         "Python" => collect_hits(&pats.py_def, content, &mut hits),
         "Go" => collect_hits(&pats.go_func, content, &mut hits),
+        // Lua content arrives pre-sanitized (comments/strings blanked).
+        "Lua" => {
+            collect_hits(&pats.lua_func_decl, content, &mut hits);
+            collect_hits(&pats.lua_func_assign, content, &mut hits);
+        }
         "Java" | "C" | "C++" | "C#" | "Kotlin" | "Swift" | "Scala" | "Dart" | "PHP" => {
             for caps in pats.generic_method.captures_iter(content) {
                 if let Some(m) = caps.get(1) {
@@ -136,6 +36,7 @@ pub(crate) fn detect_functions(content: &str, lang: &str, pats: &Patterns) -> Ve
                     hits.push(FuncHit {
                         name: name.to_string(),
                         start_line: line_index(content, start),
+                        arrow: None,
                     });
                 }
             }
@@ -152,6 +53,25 @@ pub(crate) fn collect_hits(re: &Regex, content: &str, hits: &mut Vec<FuncHit>) {
             hits.push(FuncHit {
                 name: m.as_str().to_string(),
                 start_line: line_index(content, start),
+                arrow: None,
+            });
+        }
+    }
+}
+
+/// Arrow-function hits also record where their `=>` ends (the arrow pattern
+/// matches up to and including `=>`), so the measurer can tell expression
+/// bodies from braced bodies.
+pub(crate) fn collect_arrow_hits(re: &Regex, content: &str, hits: &mut Vec<FuncHit>) {
+    for caps in re.captures_iter(content) {
+        if let Some(m) = caps.get(1) {
+            let all = caps.get(0).unwrap();
+            let after = all.end(); // byte offset just past `=>`
+            let line_start = content[..after].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            hits.push(FuncHit {
+                name: m.as_str().to_string(),
+                start_line: line_index(content, all.start()),
+                arrow: Some((line_index(content, after), after - line_start)),
             });
         }
     }
@@ -182,18 +102,159 @@ pub(crate) fn is_control_keyword(name: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Responsibility & file-type detection (for mixed-responsibility findings)
+// Function sizing
 // ---------------------------------------------------------------------------
 
-/// Where the file runs: client / server / shared. Path wins; content is the
-/// tie-breaker. This is what stops a client `App.tsx` being called a server.
-
-pub(crate) fn measure_function(lines: &[&str], start: usize, lang: &str) -> usize {
+pub(crate) fn measure_function(lines: &[&str], hit: &FuncHit, lang: &str) -> usize {
     if lang == "Python" {
-        measure_python_block(lines, start)
-    } else {
-        measure_brace_block(lines, start).unwrap_or(1)
+        return measure_python_block(lines, hit.start_line);
     }
+    if lang == "Lua" {
+        // Lua lines arrive pre-sanitized (see analyze_file).
+        return super::lua::measure_lua_block(lines, hit.start_line).unwrap_or(1);
+    }
+    // JS/TS arrow with an expression body (no `{` after `=>`): brace counting
+    // would latch onto a LATER function's braces and swallow its code, so the
+    // function ends at its statement terminator instead.
+    if let Some((al, ac)) = hit.arrow {
+        if !arrow_body_is_braced(lines, al, ac) {
+            let end = arrow_expr_end(lines, al, ac);
+            return end.saturating_sub(hit.start_line) + 1;
+        }
+    }
+    measure_brace_block(lines, hit.start_line).unwrap_or(1)
+}
+
+/// True when the arrow body starting at (line, col) — just after `=>` —
+/// opens with `{` (a braced body). Skips whitespace, crossing line breaks.
+fn arrow_body_is_braced(lines: &[&str], line: usize, col: usize) -> bool {
+    let mut i = line;
+    let mut c = col;
+    while i < lines.len() && i <= line + 4 {
+        let rest = lines[i].get(c..).unwrap_or("");
+        for ch in rest.chars() {
+            if ch.is_whitespace() {
+                continue;
+            }
+            return ch == '{';
+        }
+        i += 1;
+        c = 0;
+    }
+    false
+}
+
+/// 0-based line where a brace-less arrow body's statement ends. Tracks
+/// (), [], {} nesting from just after the `=>` (string interiors ignored);
+/// the expression is complete on the first line where nesting is back at
+/// zero and nothing continues the statement (trailing `;`/`,`, or neither
+/// side of the line break carries a continuation token).
+fn arrow_expr_end(lines: &[&str], line: usize, col: usize) -> usize {
+    let mut depth: i32 = 0;
+    let mut in_str: Option<char> = None;
+    let mut i = line;
+    while i < lines.len() {
+        let raw = if i == line { lines[i].get(col..).unwrap_or("") } else { lines[i] };
+        let eff = scan_expr_line(raw, &mut depth, &mut in_str);
+        if depth < 0 {
+            return i; // the enclosing scope closed around us — stop here
+        }
+        if depth == 0 && in_str.is_none() && statement_ends(&eff, lines, i) {
+            return i;
+        }
+        if i - line > 400 {
+            return i; // runaway guard
+        }
+        i += 1;
+    }
+    lines.len().saturating_sub(1)
+}
+
+/// At bracket depth 0: is the statement complete at the end of this line?
+/// A trailing `;`/`,` always ends it; otherwise the line must be non-empty
+/// and neither side of the line break may carry a continuation token.
+fn statement_ends(eff: &str, lines: &[&str], i: usize) -> bool {
+    let t = eff.trim_end();
+    if t.ends_with(';') || t.ends_with(',') {
+        return true;
+    }
+    !t.is_empty() && !ends_with_continuation(t) && !next_line_continues(lines, i)
+}
+
+/// Scan one line of an arrow expression: update bracket `depth` and string
+/// state, stop at a `//` comment, and return the effective text with string
+/// interiors blanked (so a `;` inside a literal never ends the statement).
+fn scan_expr_line(raw: &str, depth: &mut i32, in_str: &mut Option<char>) -> String {
+    let mut eff = String::with_capacity(raw.len());
+    let mut chars = raw.chars().peekable();
+    let mut esc = false;
+    while let Some(c) = chars.next() {
+        if let Some(q) = *in_str {
+            if esc {
+                esc = false;
+                eff.push(' ');
+            } else if c == '\\' {
+                esc = true;
+                eff.push(' ');
+            } else if c == q {
+                *in_str = None;
+                eff.push(c);
+            } else {
+                eff.push(' ');
+            }
+            continue;
+        }
+        match c {
+            '/' if chars.peek() == Some(&'/') => break, // line comment
+            '\'' | '"' | '`' => {
+                *in_str = Some(c);
+                eff.push(c);
+            }
+            '(' | '[' | '{' => {
+                *depth += 1;
+                eff.push(c);
+            }
+            ')' | ']' | '}' => {
+                *depth -= 1;
+                eff.push(c);
+            }
+            _ => eff.push(c),
+        }
+    }
+    // Plain quotes never span lines; only template literals do.
+    if matches!(*in_str, Some('\'') | Some('"')) {
+        *in_str = None;
+    }
+    eff
+}
+
+/// Trailing characters that always continue a JS/TS expression onto the next
+/// line (operators, member dots, open brackets, `=>` via its `>`...).
+fn ends_with_continuation(t: &str) -> bool {
+    matches!(
+        t.chars().last(),
+        Some(
+            '(' | '[' | '{' | '.' | '+' | '-' | '*' | '/' | '%' | '&' | '|' | '^' | '<' | '>'
+                | '=' | '?' | ':' | '~' | '!'
+        )
+    )
+}
+
+/// Leading tokens that continue an expression from the previous line
+/// (method chain, ternary branches, logical/arithmetic operators, template).
+const CONTINUATION_PREFIXES: &[&str] = &[".", "?", ":", "&&", "||", "+", "-", "*", "`"];
+
+/// True when the next non-blank line begins with a token that continues the
+/// current expression.
+fn next_line_continues(lines: &[&str], i: usize) -> bool {
+    for l in lines.iter().skip(i + 1) {
+        let t = l.trim_start();
+        if t.is_empty() {
+            continue;
+        }
+        return CONTINUATION_PREFIXES.iter().any(|p| t.starts_with(p));
+    }
+    false
 }
 
 pub(crate) fn measure_brace_block(lines: &[&str], start: usize) -> Option<usize> {
@@ -251,9 +312,3 @@ pub(crate) fn measure_python_block(lines: &[&str], start: usize) -> usize {
     }
     end - start + 1
 }
-
-// ---------------------------------------------------------------------------
-// Imports (unused + dependency graph)
-// ---------------------------------------------------------------------------
-
-
