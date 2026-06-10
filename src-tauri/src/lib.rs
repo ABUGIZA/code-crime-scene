@@ -1,7 +1,9 @@
 mod ai;
 mod analysis;
+#[cfg(test)] mod bench_test;
 mod commands;
 mod db;
+pub mod git;
 mod keychain;
 mod models;
 mod scanner;
@@ -36,6 +38,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::scan_and_analyze,
+            commands::git_forensics,
             commands::save_report,
             commands::list_reports,
             commands::list_reports_for_project,

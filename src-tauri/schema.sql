@@ -1,5 +1,6 @@
--- Code Crime Scene — SQLite schema (reference copy).
--- This is the canonical schema applied at runtime by `src-tauri/src/db.rs`.
+-- Code Crime Scene — SQLite schema (single source of truth).
+-- Applied at runtime by `src-tauri/src/db.rs` via `include_str!`. Every
+-- statement must stay `IF NOT EXISTS` style so existing databases keep opening.
 -- The live database lives in the OS app-data directory as `code-crime-scene.db`.
 
 PRAGMA journal_mode = WAL;

@@ -9,7 +9,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::models::*;
-use crate::{ai, analysis, db, keychain, scanner, util};
+use crate::{ai, analysis, db, git, keychain, scanner, util};
 
 /// Application state shared across commands: the open SQLite connection.
 pub struct AppState {
@@ -80,6 +80,20 @@ pub fn scan_and_analyze(app: AppHandle, path: String) -> Result<AnalysisResult, 
     );
 
     Ok(result)
+}
+
+// --- git forensics ------------------------------------------------------------
+
+/// Mine the project's git history (hotspots, co-change, bus factor).
+/// Best-effort: returns `available: false` instead of erroring when git is
+/// missing or the folder is not a repository.
+#[tauri::command]
+pub fn git_forensics(path: String) -> Result<git::GitForensics, String> {
+    let root = std::path::Path::new(&path);
+    if !root.is_dir() {
+        return Err(format!("Not a directory: {path}"));
+    }
+    Ok(git::collect(root))
 }
 
 // --- reports ----------------------------------------------------------------
@@ -162,32 +176,57 @@ fn sanitize_key(key: &str) -> String {
     key.chars().filter(|c| c.is_ascii_graphic()).collect()
 }
 
-#[tauri::command]
-pub fn key_exists() -> bool {
-    keychain::has_key()
+/// Canonical provider id; omitted/blank means the legacy default "deepseek",
+/// so older frontend invocations (no provider arg) keep working unchanged.
+fn resolve_provider(provider: Option<String>) -> String {
+    provider
+        .map(|p| p.trim().to_lowercase())
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(|| "deepseek".to_string())
+}
+
+/// Default model per provider when the frontend doesn't pick one.
+fn default_model(provider: &str) -> &'static str {
+    match provider {
+        "openai" => "gpt-5.2",
+        "anthropic" => "claude-sonnet-4-6",
+        "custom" => "llama3.3",
+        _ => "deepseek-chat",
+    }
 }
 
 #[tauri::command]
-pub fn save_api_key(key: String) -> Result<(), String> {
+pub fn key_exists(provider: Option<String>) -> bool {
+    keychain::has_key(&resolve_provider(provider))
+}
+
+#[tauri::command]
+pub fn save_api_key(key: String, provider: Option<String>) -> Result<(), String> {
     let clean = sanitize_key(&key);
     if clean.is_empty() {
         return Err("API key is empty.".to_string());
     }
-    keychain::save_key(&clean)
+    keychain::save_key(&resolve_provider(provider), &clean)
 }
 
 #[tauri::command]
-pub fn delete_api_key() -> Result<(), String> {
-    keychain::delete_key()
+pub fn delete_api_key(provider: Option<String>) -> Result<(), String> {
+    keychain::delete_key(&resolve_provider(provider))
 }
 
 #[tauri::command]
-pub async fn verify_api_key(key: String) -> Result<(), String> {
+pub async fn verify_api_key(
+    key: String,
+    provider: Option<String>,
+    base_url: Option<String>,
+) -> Result<(), String> {
+    let provider = resolve_provider(provider);
     let clean = sanitize_key(&key);
-    if clean.is_empty() {
+    // Custom endpoints (Ollama, LM Studio…) may legitimately need no key.
+    if clean.is_empty() && provider != "custom" {
         return Err("API key is empty.".to_string());
     }
-    ai::verify_key(&clean).await
+    ai::verify_key(&provider, base_url.as_deref().unwrap_or(""), &clean).await
 }
 
 // --- AI analysis ------------------------------------------------------------
@@ -199,16 +238,30 @@ pub async fn analyze_with_ai(
     model: Option<String>,
     report_id: Option<i64>,
     lang: Option<String>,
+    provider: Option<String>,
+    base_url: Option<String>,
 ) -> Result<String, String> {
-    let key = keychain::get_key()?
-        .ok_or_else(|| "No DeepSeek API key saved. Add one in Settings.".to_string())?;
-    let model = model.unwrap_or_else(|| "deepseek-chat".to_string());
+    let provider = resolve_provider(provider);
+    let key = match keychain::get_key(&provider)? {
+        Some(k) => k,
+        // A local OpenAI-compatible server (Ollama, LM Studio…) may need no key.
+        None if provider == "custom" => String::new(),
+        None => {
+            return Err(format!(
+                "No {} API key saved. Add one in Settings.",
+                ai::display_name(&provider)
+            ))
+        }
+    };
+    let model = model.unwrap_or_else(|| default_model(&provider).to_string());
     let lang = lang.unwrap_or_else(|| "en".to_string());
+    let base = base_url.unwrap_or_default();
 
-    let text = ai::analyze(&key, &model, &summary, &lang).await?;
+    let text = ai::analyze(&provider, &base, &key, &model, &summary, &lang).await?;
 
     if let Some(id) = report_id {
         let ai_json = serde_json::json!({
+            "provider": provider,
             "model": model,
             "generatedAt": util::now_secs(),
             "content": text,

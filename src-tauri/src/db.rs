@@ -5,40 +5,10 @@ use crate::models::*;
 use crate::util::now_secs;
 use rusqlite::{params, Connection};
 
-const SCHEMA: &str = r#"
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS settings (
-  key   TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS projects (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  path        TEXT NOT NULL UNIQUE,
-  name        TEXT NOT NULL,
-  last_opened INTEGER NOT NULL,
-  created_at  INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS reports (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id    INTEGER,
-  project_path  TEXT NOT NULL,
-  project_name  TEXT NOT NULL,
-  created_at    INTEGER NOT NULL,
-  overall_score INTEGER NOT NULL,
-  grade         TEXT NOT NULL,
-  scores_json   TEXT NOT NULL,
-  analysis_json TEXT NOT NULL,
-  ai_json       TEXT,
-  FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_reports_project ON reports(project_path);
-CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at DESC);
-"#;
+/// Single source of truth for the schema — `src-tauri/schema.sql`. All
+/// statements are `IF NOT EXISTS` style, so applying it to an existing
+/// database is a no-op.
+const SCHEMA: &str = include_str!("../schema.sql");
 
 pub fn init(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(SCHEMA)
