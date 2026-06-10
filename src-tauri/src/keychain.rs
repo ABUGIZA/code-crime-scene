@@ -1,36 +1,47 @@
 //! Secure API-key storage using the OS keychain (Windows Credential Manager,
-//! macOS Keychain, ...). The key is never written to disk in plaintext and is
-//! never sent to the webview/JS — only Rust reads it when calling DeepSeek.
+//! macOS Keychain, ...). Keys are never written to disk in plaintext and are
+//! never sent to the webview/JS — only Rust reads them when calling a provider.
+//! One keychain account per AI provider.
 
 use keyring::{Entry, Error as KeyringError};
 
 const SERVICE: &str = "com.mhmds.code-crime-scene";
-const ACCOUNT: &str = "deepseek-api-key";
 
-fn entry() -> Result<Entry, String> {
-    Entry::new(SERVICE, ACCOUNT).map_err(|e| e.to_string())
+/// Keychain account for a provider id. Unknown/legacy ids fall back to the
+/// original DeepSeek account so previously stored keys keep working.
+fn account_for(provider: &str) -> &'static str {
+    match provider {
+        "openai" => "openai-api-key",
+        "anthropic" => "anthropic-api-key",
+        "custom" => "custom-api-key",
+        _ => "deepseek-api-key",
+    }
 }
 
-pub fn save_key(key: &str) -> Result<(), String> {
-    entry()?.set_password(key).map_err(|e| e.to_string())
+fn entry(provider: &str) -> Result<Entry, String> {
+    Entry::new(SERVICE, account_for(provider)).map_err(|e| e.to_string())
 }
 
-pub fn get_key() -> Result<Option<String>, String> {
-    match entry()?.get_password() {
+pub fn save_key(provider: &str, key: &str) -> Result<(), String> {
+    entry(provider)?.set_password(key).map_err(|e| e.to_string())
+}
+
+pub fn get_key(provider: &str) -> Result<Option<String>, String> {
+    match entry(provider)?.get_password() {
         Ok(p) => Ok(Some(p)),
         Err(KeyringError::NoEntry) => Ok(None),
         Err(e) => Err(e.to_string()),
     }
 }
 
-pub fn delete_key() -> Result<(), String> {
-    match entry()?.delete_credential() {
+pub fn delete_key(provider: &str) -> Result<(), String> {
+    match entry(provider)?.delete_credential() {
         Ok(()) => Ok(()),
         Err(KeyringError::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
     }
 }
 
-pub fn has_key() -> bool {
-    matches!(get_key(), Ok(Some(_)))
+pub fn has_key(provider: &str) -> bool {
+    matches!(get_key(provider), Ok(Some(_)))
 }
