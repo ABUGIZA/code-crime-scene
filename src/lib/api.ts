@@ -24,6 +24,18 @@ export function errText(e: unknown): string {
 
 let mockProgressCb: ((p: ProgressPayload) => void) | null = null;
 
+// --- external links ---------------------------------------------------------
+
+/** Open an external link in the system browser (new tab in web preview). */
+export async function openExternal(url: string): Promise<void> {
+  if (isTauri) {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener");
+}
+
 // --- folder picker ----------------------------------------------------------
 
 export async function pickFolder(): Promise<string | null> {

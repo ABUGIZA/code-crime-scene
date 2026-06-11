@@ -23,6 +23,8 @@ export const AR_UI: Dict = {
   "home.empty": "ما فيه قضايا بعد. افتح أول مشروع ونبدأ نرفع البصمات.",
   "home.reports": "{n} تقارير",
   "home.report": "تقرير واحد",
+  "home.bench": "بنشمارك المحرك",
+  "home.benchSub": "v1 ضد v2 على 34 دليلًا مزروعًا — أرقام مقاسة وقابلة لإعادة القياس، شاهدها مباشرة",
 
   // analyzing
   "analyzing.eyebrow": "التحقيق الجنائي شغّال",

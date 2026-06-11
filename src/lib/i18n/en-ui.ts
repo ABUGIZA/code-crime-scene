@@ -23,6 +23,8 @@ export const EN_UI: Dict = {
   "home.empty": "No cases yet. Open your first project to dust it for prints.",
   "home.reports": "{n} reports",
   "home.report": "{n} report",
+  "home.bench": "Engine benchmark",
+  "home.benchSub": "v1 vs v2 on 34 planted evidence items — measured, reproducible, live",
 
   // analyzing
   "analyzing.eyebrow": "Forensic sweep in progress",

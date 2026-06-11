@@ -4,7 +4,7 @@ import { useI18n } from "../lib/i18n";
 import * as api from "../lib/api";
 import type { ProjectRecord } from "../lib/types";
 import { timeAgo } from "../lib/format";
-import { Magnifier, Folder } from "../components/Icons";
+import { Magnifier, Folder, Stack } from "../components/Icons";
 import { CaseFileArt } from "../components/EmptyArt";
 
 export function Home() {
@@ -71,6 +71,22 @@ export function Home() {
             </div>
           ))
         )}
+      </div>
+
+      <div
+        className="recent-item"
+        role="link"
+        style={{ marginTop: 18, border: "1px solid var(--amber)", background: "color-mix(in srgb, var(--amber) 6%, transparent)" }}
+        onClick={() => api.openExternal("https://ccs-benchmark.vercel.app")}
+      >
+        <span className="folder" style={{ color: "var(--amber)" }}>
+          <Stack size={20} />
+        </span>
+        <div className="meta">
+          <div className="name">{t("home.bench")}</div>
+          <div className="path">{t("home.benchSub")}</div>
+        </div>
+        <div className="num" style={{ fontSize: 18, color: "var(--amber)" }}>↗</div>
       </div>
     </div>
   );
