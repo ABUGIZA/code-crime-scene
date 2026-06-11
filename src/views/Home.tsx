@@ -33,6 +33,15 @@ export function Home() {
           <h1 className="page-title">{t("home.title")}</h1>
           <div className="page-sub">{t("home.subtitle")}</div>
         </div>
+        <button
+          className="btn"
+          title={t("home.benchSub")}
+          style={{ borderColor: "var(--amber)", color: "var(--amber)", display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}
+          onClick={() => api.openExternal("https://ccs-benchmark.vercel.app")}
+        >
+          <Stack size={16} />
+          {t("home.bench")} ↗
+        </button>
       </div>
 
       <div className="dropzone ticks" onClick={pick}>
@@ -71,22 +80,6 @@ export function Home() {
             </div>
           ))
         )}
-      </div>
-
-      <div
-        className="recent-item"
-        role="link"
-        style={{ marginTop: 18, border: "1px solid var(--amber)", background: "color-mix(in srgb, var(--amber) 6%, transparent)" }}
-        onClick={() => api.openExternal("https://ccs-benchmark.vercel.app")}
-      >
-        <span className="folder" style={{ color: "var(--amber)" }}>
-          <Stack size={20} />
-        </span>
-        <div className="meta">
-          <div className="name">{t("home.bench")}</div>
-          <div className="path">{t("home.benchSub")}</div>
-        </div>
-        <div className="num" style={{ fontSize: 18, color: "var(--amber)" }}>↗</div>
       </div>
     </div>
   );
